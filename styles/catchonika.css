@@ -17,7 +17,7 @@
 /* Card mode – ideal for tabs/panels */
 .catchonika--card {
     display: block;
-    width: 100%;
+    width: 97%;
     background: linear-gradient(180deg, var(--c-bg), var(--c-bg-2));
     border: 1px solid var(--c-border);
     border-radius: 12px;

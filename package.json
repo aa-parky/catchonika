@@ -1,0 +1,15 @@
+{
+  "name": "catchonika",
+  "version": "1.0.0",
+  "description": "**Never miss the melody.** Catchonika starts recording from **every available Web MIDI input** as soon as it loads. Save the last 60s (or any range) or the whole session to a `.mid` using [MidiWriterJS](https://github.com/grimmdude/MidiWriterJS).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "midi-writer-js": "^3.1.1"
+  }
+}
