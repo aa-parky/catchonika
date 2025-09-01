@@ -1,6 +1,6 @@
 // Catchonika — default-on MIDI capture and one-click export to .mid
 // Card-ready: render neatly inside any container (tabs, panels, etc.)
-// v1.1.3 — show take duration + wall-clock start time; preserve global alignment on export
+// v1.1.3 — show take duration and wall-clock start time; preserve global alignment on export
 
 (() => {
     const PPQ = 128;
@@ -252,7 +252,6 @@
 
         _renderTakesList() {
             if (!this._takesListEl) return;
-            const fmt = (ms) => this._formatMs(ms);
 
             const rows = [];
             this._takes.forEach((t, i) => {
@@ -282,18 +281,11 @@
                         <span class="catchonika__take-time">
                             <span class="catchonika__take-meta">Started: ${startedClock} • Duration: ${Math.max(0, Math.round(length / 1000))} seconds</span>
                         </span>
-                        <span class="catchonika__take-badge">recording…</span>
+                        <span class="catchonika__take-badge">Recording…</span>
                     </div>`
                 );
             }
             this._takesListEl.innerHTML = rows.join('') || `<div class="catchonika__take-empty">No takes yet. Press sustain to start a take.</div>`;
-        }
-
-        _formatMs(ms) {
-            const totalSeconds = Math.max(0, Math.round(ms / 1000));
-            const m = Math.floor(totalSeconds / 60);
-            const s = totalSeconds % 60;
-            return `${m}:${String(s).padStart(2, '0')}`;
         }
 
         _fmtClock(epochMs) {
@@ -427,10 +419,9 @@
                     continue;
                 }
 
-                // Zero-base against global earliest start to preserve inter-track alignment
-                const t0 = _t0Global;
+                // Zero-base against the global earliest start to preserve inter-track alignment
                 for (const n of notes) {
-                    const startTick = msToTicks(n.startMs - t0, bpm, PPQ);
+                    const startTick = msToTicks(n.startMs - _t0Global, bpm, PPQ);
                     const durTick   = msToTicks(n.endMs - n.startMs, bpm, PPQ);
                     const velocity01_100 = clamp(Math.round((n.vel / 127) * 100), 1, 100);
 
