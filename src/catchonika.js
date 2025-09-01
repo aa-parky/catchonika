@@ -1,6 +1,6 @@
 // Catchonika — default-on MIDI capture and one-click export to .mid
 // Card-ready: render neatly inside any container (tabs, panels, etc.)
-// v1.1.2 — fix: remove leading silence by zero-basing export times per take/range
+// v1.1.3 — show take duration + wall-clock start time; preserve global alignment on export
 
 (() => {
     const PPQ = 128;
@@ -40,6 +40,7 @@
             this._midi = null;
             this._inputs = new Map();
             this._start = ts();
+            this._startEpoch = Date.now(); // wall-clock epoch for display
 
             this._events = [];             // {t, type, ch, note, vel, cc, val, inputId, inputName}
             this._active = new Map();      // "ch:note" -> {tOn, vel, inputId}
@@ -252,13 +253,18 @@
         _renderTakesList() {
             if (!this._takesListEl) return;
             const fmt = (ms) => this._formatMs(ms);
+
             const rows = [];
             this._takes.forEach((t, i) => {
                 const length = t.endMs - t.startMs;
+                const startedAtEpoch = this._startEpoch + t.startMs;
+                const startedClock = this._fmtClock(startedAtEpoch);
                 rows.push(
-                    `<div class="catchonika__take">
+                    `<div class="catchonika__take" title="Started ${startedClock} • Duration ${Math.max(0, Math.round(length / 1000))}s">
                         <span class="catchonika__take-label">Take ${i + 1}</span>
-                        <span class="catchonika__take-time">${fmt(t.startMs)} – ${fmt(t.endMs)} (${fmt(length)})</span>
+                        <span class="catchonika__take-time">
+                            <span class="catchonika__take-meta">Started: ${startedClock} • Duration: ${Math.max(0, Math.round(length / 1000))} seconds</span>
+                        </span>
                         <button class="catchonika__btn catchonika__btn--small" data-action="save-take" data-index="${i}" title="Save this take">Save</button>
                     </div>`
                 );
@@ -268,10 +274,14 @@
                 const t = this._currentTake;
                 const now = t.lastActivityMs;
                 const length = now - t.startMs;
+                const startedAtEpoch = this._startEpoch + t.startMs;
+                const startedClock = this._fmtClock(startedAtEpoch);
                 rows.push(
-                    `<div class="catchonika__take catchonika__take--active">
+                    `<div class="catchonika__take catchonika__take--active" title="Recording… • Started ${startedClock} • Duration ${Math.max(0, Math.round(length / 1000))}s">
                         <span class="catchonika__take-label">Take ${i + 1}</span>
-                        <span class="catchonika__take-time">${fmt(t.startMs)} – … (${fmt(length)})</span>
+                        <span class="catchonika__take-time">
+                            <span class="catchonika__take-meta">Started: ${startedClock} • Duration: ${Math.max(0, Math.round(length / 1000))} seconds</span>
+                        </span>
                         <span class="catchonika__take-badge">recording…</span>
                     </div>`
                 );
@@ -284,6 +294,14 @@
             const m = Math.floor(totalSeconds / 60);
             const s = totalSeconds % 60;
             return `${m}:${String(s).padStart(2, '0')}`;
+        }
+
+        _fmtClock(epochMs) {
+            try {
+                return new Date(epochMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            } catch {
+                return '';
+            }
         }
 
         _saveRange(startMs, endMs, { bpm, label } = {}) {
@@ -409,9 +427,8 @@
                     continue;
                 }
 
-                // ---- ZERO-BASE THE TAKE/RANGE ----
-                // Remove leading silence: find the earliest musical start in this track
-                const t0 = _t0Global; // notes are sorted by startMs
+                // Zero-base against global earliest start to preserve inter-track alignment
+                const t0 = _t0Global;
                 for (const n of notes) {
                     const startTick = msToTicks(n.startMs - t0, bpm, PPQ);
                     const durTick   = msToTicks(n.endMs - n.startMs, bpm, PPQ);
