@@ -1,16 +1,34 @@
 // Catchonika — default-on MIDI capture and one-click export to .mid
 // Card-ready: render neatly inside any container (tabs, panels, etc.)
-// v1.1.3 — show take duration and wall-clock start time; preserve global alignment on export
+// v1.2.0 — persistent takes and event buffer via localStorage; fixed-height scroll card friendly
 
 (() => {
     const PPQ = 128;
     const DEFAULT_BPM = 120;
+    const STORAGE_KEY = "catchonika_state_v1";
+    const PERSIST_DEBOUNCE_MS = 750;
 
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-    const ts = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+    const ts = () =>
+        typeof performance !== "undefined" && performance.now
+            ? performance.now()
+            : Date.now();
 
     function midiNoteToName(n) {
-        const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const names = [
+            "C",
+            "C#",
+            "D",
+            "D#",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "G#",
+            "A",
+            "A#",
+            "B",
+        ];
         return `${names[n % 12]}${Math.floor(n / 12) - 1}`;
     }
     function msToTicks(ms, bpm, ppq = PPQ) {
@@ -20,63 +38,192 @@
     class Catchonika {
         /**
          * @param {Object} opts
-         * @param {HTMLElement|string} [opts.mount] Element or selector to render UI. If omitted, creates a floating widget.
-         * @param {"card"|"floating"} [opts.mode="card"] Presentation mode. "card" is ideal for tabs.
-         * @param {number} [opts.bufferMinutes=30] Rolling buffer length.
-         * @param {number} [opts.defaultBpm=120] Default BPM for export.
-         * @param {boolean} [opts.groupByChannel=false] Track per MIDI channel on export.
-         * @param {number} [opts.takeIdleSeconds=3] Seconds of inactivity to end an auto-take.
+         * @param {HTMLElement|string} [opts.mount]
+         * @param {"card"|"floating"} [opts.mode="card"]
+         * @param {number} [opts.bufferMinutes=30]
+         * @param {number} [opts.defaultBpm=120]
+         * @param {boolean} [opts.groupByChannel=false]
+         * @param {number} [opts.takeIdleSeconds=3]
          */
         constructor(opts = {}) {
             this.settings = {
                 bufferMinutes: opts.bufferMinutes ?? 30,
                 defaultBpm: opts.defaultBpm ?? DEFAULT_BPM,
                 groupByChannel: opts.groupByChannel ?? false,
-                mode: opts.mode ?? 'card',
+                mode: opts.mode ?? "card",
                 takeIdleSeconds: opts.takeIdleSeconds ?? 3,
             };
 
-            this._mount = typeof opts.mount === 'string' ? document.querySelector(opts.mount) : opts.mount;
+            this._mount =
+                typeof opts.mount === "string"
+                    ? document.querySelector(opts.mount)
+                    : opts.mount;
             this._midi = null;
             this._inputs = new Map();
-            this._start = ts();
-            this._startEpoch = Date.now(); // wall-clock epoch for display
 
-            this._events = [];             // {t, type, ch, note, vel, cc, val, inputId, inputName}
-            this._active = new Map();      // "ch:note" -> {tOn, vel, inputId}
-            this._sustain = new Map();     // ch -> bool
+            // Base timing: align performance.now() to wall clock so restored items line up
+            const nowPerf = ts();
+            const nowEpoch = Date.now();
+            this._startEpoch = nowEpoch; // wall clock epoch for t=0 default
+            this._start = nowPerf - (nowEpoch - this._startEpoch);
+
+            this._events = []; // {t, type, ch, note, vel, cc, val, inputId, inputName}
+            this._active = new Map(); // "ch:note" -> {tOn, vel, inputId}
+            this._sustain = new Map(); // ch -> bool
             this._pendingRelease = new Map(); // ch -> Set(keys)
 
             // Auto-take state
-            this._takes = [];              // [{ startMs, endMs }]
-            this._currentTake = null;      // { startMs, lastActivityMs }
-            this._idleTimer = null;        // inactivity timeout id
+            this._takes = []; // [{ startMs, endMs }]
+            this._currentTake = null; // { startMs, lastActivityMs }
+            this._idleTimer = null; // inactivity timeout id
+
+            // Persistence debounce a handle
+            this._persistTimer = null;
+
+            // Try to restore the previous state before we render
+            this._loadState();
 
             this._renderUI();
             this._attachUIHandlers();
             void this._initMIDI();
-            this._gcInterval = setInterval(() => this._gc(), 10_000);
-            // Ensure cleanup on the page unloaded and mark destroy as used internally
-            this._onBeforeUnload = () => this.destroy();
-            window.addEventListener('beforeunload', this._onBeforeUnload);
+            this._gcInterval = setInterval(() => {
+                this._gc();
+            }, 10_000);
+
+            // Save on unload so we don't lose the last few seconds
+            this._onBeforeUnload = () => {
+                try {
+                    this._saveState();
+                } catch {}
+                this.destroy();
+            };
+            window.addEventListener("beforeunload", this._onBeforeUnload);
         }
 
         destroy() {
             if (this._onBeforeUnload) {
-                window.removeEventListener('beforeunload', this._onBeforeUnload);
+                window.removeEventListener("beforeunload", this._onBeforeUnload);
                 this._onBeforeUnload = null;
             }
             if (this._midi) {
                 this._midi.onstatechange = null;
-                this._inputs.forEach(inp => inp.onmidimessage = null);
-                this._midi = null; // ensure GC of MIDI access
+                this._inputs.forEach((inp) => (inp.onmidimessage = null));
+                this._midi = null;
             }
             if (this._idleTimer) {
                 clearTimeout(this._idleTimer);
                 this._idleTimer = null;
             }
+            if (this._persistTimer) {
+                clearTimeout(this._persistTimer);
+                this._persistTimer = null;
+            }
             clearInterval(this._gcInterval);
             this._teardownUI();
+        }
+
+        // === Persistence =========================================================
+
+        _schedulePersist() {
+            if (this._persistTimer) clearTimeout(this._persistTimer);
+            this._persistTimer = setTimeout(
+                () => this._saveState(),
+                PERSIST_DEBOUNCE_MS,
+            );
+        }
+
+        _saveState() {
+            // Convert relative 't' to absolute epoch for storage
+            const toAbs = (rel) => this._startEpoch + rel;
+            const maxMs = this.settings.bufferMinutes * 60 * 1000;
+            const nowRel = ts() - this._start;
+            const cutoff = nowRel - maxMs;
+            const prunedEvents = this._events.filter(
+                (e) => e.t >= Math.max(0, cutoff),
+            );
+
+            const state = {
+                version: 2,
+                baseEpoch: this._startEpoch,
+                settings: this.settings,
+                events: prunedEvents.map((e) => {
+                    const { t, ...rest } = e;
+                    return { tAbs: Math.round(toAbs(t)), ...rest };
+                }),
+                takes: this._takes.map((tk) => ({
+                    startAbs: Math.round(toAbs(tk.startMs)),
+                    endAbs: tk.endMs != null ? Math.round(toAbs(tk.endMs)) : null,
+                })),
+                // Do not persist an in-flight take; it's safer to finalize on inactivity
+            };
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (err) {
+                // If too large, drop the oldest half of events and try once more
+                try {
+                    const trimmed = {
+                        ...state,
+                        events: state.events.slice(Math.floor(state.events.length / 2)),
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+                } catch {}
+            }
+        }
+
+        _loadState() {
+            let raw = null;
+            try {
+                raw = localStorage.getItem(STORAGE_KEY);
+            } catch {}
+            if (!raw) return;
+
+            try {
+                const state = JSON.parse(raw);
+                if (!state || typeof state !== "object") return;
+
+                const baseEpoch = Number.isFinite(state.baseEpoch)
+                    ? state.baseEpoch
+                    : Date.now();
+                // Re-anchor start/startEpoch so that new events align with restored ones
+                const nowPerf = ts();
+                const nowEpoch = Date.now();
+                this._startEpoch = baseEpoch;
+                this._start = nowPerf - (nowEpoch - this._startEpoch);
+
+                // Restore settings (keep constructor overrides)
+                if (state.settings && typeof state.settings === "object") {
+                    this.settings = { ...this.settings, ...state.settings };
+                }
+
+                // Restore events (to relative)
+                if (Array.isArray(state.events)) {
+                    this._events = state.events.map((e) => ({
+                        ...e,
+                        t: Math.max(0, (e.tAbs ?? 0) - this._startEpoch),
+                    }));
+                }
+
+                // Restore takes
+                if (Array.isArray(state.takes)) {
+                    this._takes = state.takes
+                        .map((tk) => ({
+                            startMs: Math.max(0, (tk.startAbs ?? 0) - this._startEpoch),
+                            endMs:
+                                tk.endAbs != null
+                                    ? Math.max(0, tk.endAbs - this._startEpoch)
+                                    : null,
+                        }))
+                        .filter((tk) => tk.endMs != null); // ignore any incomplete ones
+                }
+            } catch {
+                // ignore broken state
+            }
+        }
+
+        _wipeState() {
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+            } catch {}
         }
 
         // --- MIDI ---------------------------------------------------------------
@@ -102,7 +249,8 @@
                 input.onmidimessage = (msg) => this._onMIDIMessage(input, msg);
                 this._inputs.set(input.id, input);
             }
-            const names = [...this._inputs.values()].map(i => i.name).join(', ') || 'none';
+            const names =
+                [...this._inputs.values()].map((i) => i.name).join(", ") || "none";
             this._status(`Inputs: ${names}`);
         }
 
@@ -111,17 +259,18 @@
             if (!data || data.length < 1) return;
 
             const status = data[0];
-            const type = status & 0xF0;
-            const ch = (status & 0x0F) + 1;
+            const type = status & 0xf0;
+            const ch = (status & 0x0f) + 1;
             const tNow = ts();
             const t = tNow - this._start;
             const inputId = input.id;
-            const inputName = input.name || '';
+            const inputName = input.name || "";
 
             const sustainDown = (c) => this._sustain.get(c) === true;
             const setSustain = (c, val) => this._sustain.set(c, !!val);
             const pendKeySet = (c) => {
-                if (!this._pendingRelease.has(c)) this._pendingRelease.set(c, new Set());
+                if (!this._pendingRelease.has(c))
+                    this._pendingRelease.set(c, new Set());
                 return this._pendingRelease.get(c);
             };
 
@@ -132,23 +281,49 @@
                 const note = data[1];
                 const vel = data[2] || 0;
                 if (vel > 0) {
-                    this._events.push({ t, type: 'noteon', ch, note, vel, inputId, inputName });
+                    this._events.push({
+                        t,
+                        type: "noteon",
+                        ch,
+                        note,
+                        vel,
+                        inputId,
+                        inputName,
+                    });
                     this._active.set(`${ch}:${note}`, { tOn: t, vel, inputId });
+                    this._schedulePersist();
                 } else {
-                    this._handleNoteOff(t, ch, note, inputId, inputName, sustainDown, pendKeySet);
+                    this._handleNoteOff(
+                        t,
+                        ch,
+                        note,
+                        inputId,
+                        inputName,
+                        sustainDown,
+                        pendKeySet,
+                    );
                 }
                 return;
             }
 
             if (type === 0x80) {
-                this._handleNoteOff(t, ch, data[1], inputId, inputName, sustainDown, pendKeySet);
+                this._handleNoteOff(
+                    t,
+                    ch,
+                    data[1],
+                    inputId,
+                    inputName,
+                    sustainDown,
+                    pendKeySet,
+                );
                 return;
             }
 
-            if (type === 0xB0) {
+            if (type === 0xb0) {
                 const cc = data[1];
                 const val = data[2] ?? 0;
-                this._events.push({ t, type: 'cc', ch, cc, val, inputId, inputName });
+                this._events.push({ t, type: "cc", ch, cc, val, inputId, inputName });
+                this._schedulePersist();
 
                 if (cc === 64) {
                     const wasDown = sustainDown(ch);
@@ -163,44 +338,77 @@
                     // Sustain released: flush deferred note-offs
                     if (wasDown && !nowDown) {
                         const keys = pendKeySet(ch);
-                        keys.forEach(key => {
+                        keys.forEach((key) => {
                             const active = this._active.get(key);
                             if (active) {
-                                this._events.push({ t, type: 'noteoff', ch, note: parseInt(key.split(':')[1], 10), inputId, inputName });
+                                this._events.push({
+                                    t,
+                                    type: "noteoff",
+                                    ch,
+                                    note: parseInt(key.split(":")[1], 10),
+                                    inputId,
+                                    inputName,
+                                });
                                 this._active.delete(key);
                             }
                         });
                         keys.clear();
+                        this._schedulePersist();
                     }
                 }
                 return;
             }
 
-            if (type === 0xE0) {
+            if (type === 0xe0) {
                 const lsb = data[1] ?? 0;
                 const msb = data[2] ?? 0;
                 const value = ((msb << 7) | lsb) - 8192;
-                this._events.push({ t, type: 'pitchbend', ch, value, inputId, inputName });
+                this._events.push({
+                    t,
+                    type: "pitchbend",
+                    ch,
+                    value,
+                    inputId,
+                    inputName,
+                });
+                this._schedulePersist();
                 return;
             }
 
-            this._events.push({ t, type: 'raw', bytes: Array.from(data), ch, inputId, inputName });
+            this._events.push({
+                t,
+                type: "raw",
+                bytes: Array.from(data),
+                ch,
+                inputId,
+                inputName,
+            });
+            this._schedulePersist();
         }
 
         _handleNoteOff(t, ch, note, inputId, inputName, sustainDown, pendKeySet) {
             const key = `${ch}:${note}`;
             const active = this._active.get(key);
             if (!active) {
-                this._events.push({ t, type: 'noteoff', ch, note, inputId, inputName });
+                this._events.push({ t, type: "noteoff", ch, note, inputId, inputName });
+                this._schedulePersist();
                 return;
             }
             if (sustainDown(ch)) {
                 pendKeySet(ch).add(key);
-                this._events.push({ t, type: 'noteoff_deferred', ch, note, inputId, inputName });
+                this._events.push({
+                    t,
+                    type: "noteoff_deferred",
+                    ch,
+                    note,
+                    inputId,
+                    inputName,
+                });
             } else {
-                this._events.push({ t, type: 'noteoff', ch, note, inputId, inputName });
+                this._events.push({ t, type: "noteoff", ch, note, inputId, inputName });
                 this._active.delete(key);
             }
+            this._schedulePersist();
         }
 
         // --- Auto-takes ----------------------------------------------------------
@@ -211,8 +419,14 @@
                 this._status(`No take #${index + 1}`);
                 return;
             }
-            const bpmToUse = Number.isFinite(opts.bpm) ? opts.bpm : (parseFloat(this._bpmInput?.value) || this.settings.defaultBpm);
-            return this._saveRange(take.startMs, take.endMs ?? (ts() - this._start), { bpm: bpmToUse, label: `take-${index + 1}`, ...opts });
+            const bpmToUse = Number.isFinite(opts.bpm)
+                ? opts.bpm
+                : parseFloat(this._bpmInput?.value) || this.settings.defaultBpm;
+            return this._saveRange(take.startMs, take.endMs ?? ts() - this._start, {
+                bpm: bpmToUse,
+                label: `take-${index + 1}`,
+                ...opts,
+            });
         }
 
         _startTake(t) {
@@ -220,6 +434,7 @@
             this._currentTake = { startMs: t, lastActivityMs: t };
             this._resetIdleTimer();
             this._renderTakesList();
+            this._schedulePersist();
             this._status(`Take ${this._takes.length + 1} started`);
         }
 
@@ -229,11 +444,12 @@
                 clearTimeout(this._idleTimer);
                 this._idleTimer = null;
             }
-            const endMs = this._currentTake.lastActivityMs ?? (ts() - this._start);
+            const endMs = this._currentTake.lastActivityMs ?? ts() - this._start;
             this._takes.push({ startMs: this._currentTake.startMs, endMs });
             const takeNum = this._takes.length;
             this._currentTake = null;
             this._renderTakesList();
+            this._schedulePersist();
             this._status(`Take ${takeNum} ended`);
         }
 
@@ -265,7 +481,7 @@
                             <span class="catchonika__take-meta">Started: ${startedClock} • Duration: ${Math.max(0, Math.round(length / 1000))} seconds</span>
                         </span>
                         <button class="catchonika__btn catchonika__btn--small" data-action="save-take" data-index="${i}" title="Save this take">Save</button>
-                    </div>`
+                    </div>`,
                 );
             });
             if (this._currentTake) {
@@ -282,37 +498,45 @@
                             <span class="catchonika__take-meta">Started: ${startedClock} • Duration: ${Math.max(0, Math.round(length / 1000))} seconds</span>
                         </span>
                         <span class="catchonika__take-badge">Recording…</span>
-                    </div>`
+                    </div>`,
                 );
             }
-            this._takesListEl.innerHTML = rows.join('') || `<div class="catchonika__take-empty">No takes yet. Press sustain to start a take.</div>`;
+            this._takesListEl.innerHTML =
+                rows.join("") ||
+                `<div class="catchonika__take-empty">No takes yet. Press sustain to start a take.</div>`;
         }
 
         _fmtClock(epochMs) {
             try {
-                return new Date(epochMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                return new Date(epochMs).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                });
             } catch {
-                return '';
+                return "";
             }
         }
 
         _saveRange(startMs, endMs, { bpm, label } = {}) {
             const bpmToUse = Number.isFinite(bpm) ? bpm : this.settings.defaultBpm;
             const events = this._events
-                .filter(e => e.t >= startMs && e.t <= endMs)
+                .filter((e) => e.t >= startMs && e.t <= endMs)
                 .sort((a, b) => a.t - b.t);
 
-            const notesByTrack = self._reconstructNotes ? self._reconstructNotes(events, startMs, endMs) : this._reconstructNotes(events, startMs, endMs);
+            const notesByTrack = self._reconstructNotes
+                ? self._reconstructNotes(events, startMs, endMs)
+                : this._reconstructNotes(events, startMs, endMs);
             const writer = this._buildMidi(notesByTrack, bpmToUse);
 
             const file = writer.buildFile();
-            const blob = new Blob([file], { type: 'audio/midi' });
+            const blob = new Blob([file], { type: "audio/midi" });
             const url = URL.createObjectURL(blob);
 
-            const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const stamp = new Date().toISOString().replace(/[:.]/g, "-");
             const fname = `catchonika-${label}-${Math.round(bpmToUse)}bpm-${stamp}.mid`;
 
-            const a = document.createElement('a');
+            const a = document.createElement("a");
             a.href = url;
             a.download = fname;
             document.body.appendChild(a);
@@ -336,23 +560,33 @@
             const notes = [];
             const pushNote = (ch, note, tOn, tOff, vel) => {
                 const startMs = Math.max(windowStart, Math.min(windowEnd, tOn));
-                const endMs = Math.max(windowStart, Math.min(windowEnd, tOff ?? windowEnd));
+                const endMs = Math.max(
+                    windowStart,
+                    Math.min(windowEnd, tOff ?? windowEnd),
+                );
                 if (endMs > startMs) notes.push({ ch, note, startMs, endMs, vel });
             };
 
-            const trackKeyFor = (ch) => (this.settings.groupByChannel ? `ch-${ch}` : `main`);
+            const trackKeyFor = (ch) =>
+                this.settings.groupByChannel ? `ch-${ch}` : `main`;
 
             for (const e of events) {
-                if (e.type === 'cc' && e.cc === 64) {
+                if (e.type === "cc" && e.cc === 64) {
                     const down = e.val >= 64;
                     const was = sustain.get(e.ch) === true;
                     sustain.set(e.ch, down);
                     if (was && !down) {
                         const keys = ensureSet(pending, e.ch);
-                        keys.forEach(key => {
+                        keys.forEach((key) => {
                             const st = active.get(key);
                             if (st) {
-                                pushNote(e.ch, parseInt(key.split(':')[1], 10), st.tOn, e.t, st.vel);
+                                pushNote(
+                                    e.ch,
+                                    parseInt(key.split(":")[1], 10),
+                                    st.tOn,
+                                    e.t,
+                                    st.vel,
+                                );
                                 active.delete(key);
                             }
                         });
@@ -360,11 +594,11 @@
                     }
                     continue;
                 }
-                if (e.type === 'noteon') {
+                if (e.type === "noteon") {
                     active.set(`${e.ch}:${e.note}`, { tOn: e.t, vel: e.vel });
                     continue;
                 }
-                if (e.type === 'noteoff' || e.type === 'noteoff_deferred') {
+                if (e.type === "noteoff" || e.type === "noteoff_deferred") {
                     const key = `${e.ch}:${e.note}`;
                     const st = active.get(key);
                     if (!st) continue;
@@ -377,8 +611,14 @@
                 }
             }
             for (const [key, st] of active.entries()) {
-                const [chStr, noteStr] = key.split(':');
-                pushNote(parseInt(chStr, 10), parseInt(noteStr, 10), st.tOn, windowEnd, st.vel);
+                const [chStr, noteStr] = key.split(":");
+                pushNote(
+                    parseInt(chStr, 10),
+                    parseInt(noteStr, 10),
+                    st.tOn,
+                    windowEnd,
+                    st.vel,
+                );
             }
 
             const byTrack = new Map();
@@ -387,14 +627,15 @@
                 if (!byTrack.has(k)) byTrack.set(k, []);
                 byTrack.get(k).push(n);
             }
-            for (const arr of byTrack.values()) arr.sort((a, b) => a.startMs - b.startMs);
+            for (const arr of byTrack.values())
+                arr.sort((a, b) => a.startMs - b.startMs);
             return byTrack;
         }
 
         _buildMidi(notesByTrack, bpm) {
-            const MidiWriter = (globalThis.MidiWriter) ? globalThis.MidiWriter : null;
+            const MidiWriter = globalThis.MidiWriter ? globalThis.MidiWriter : null;
             if (!MidiWriter) {
-                throw new Error('MidiWriterJS not found. Load it before Catchonika.');
+                throw new Error("MidiWriterJS not found. Load it before Catchonika.");
             }
 
             const tracks = [];
@@ -422,7 +663,7 @@
                 // Zero-base against the global earliest start to preserve inter-track alignment
                 for (const n of notes) {
                     const startTick = msToTicks(n.startMs - _t0Global, bpm, PPQ);
-                    const durTick   = msToTicks(n.endMs - n.startMs, bpm, PPQ);
+                    const durTick = msToTicks(n.endMs - n.startMs, bpm, PPQ);
                     const velocity01_100 = clamp(Math.round((n.vel / 127) * 100), 1, 100);
 
                     const evt = new MidiWriter.NoteEvent({
@@ -443,9 +684,10 @@
 
         _gc() {
             const maxMs = this.settings.bufferMinutes * 60 * 1000;
-            const cutoff = (ts() - this._start) - maxMs;
+            const cutoff = ts() - this._start - maxMs;
             if (cutoff <= 0) return;
-            this._events = this._events.filter(e => e.t >= cutoff);
+            this._events = this._events.filter((e) => e.t >= cutoff);
+            this._schedulePersist();
         }
 
         clear() {
@@ -454,7 +696,6 @@
             this._sustain.clear();
             this._pendingRelease.clear();
 
-            // Clear takes and timers
             if (this._idleTimer) {
                 clearTimeout(this._idleTimer);
                 this._idleTimer = null;
@@ -463,44 +704,52 @@
             this._takes = [];
             this._renderTakesList();
 
-            this._status('Cleared buffer.');
+            this._wipeState();
+            this._status("Cleared buffer.");
         }
 
         // --- UI ------------------------------------------------------------------
 
         _renderUI() {
-            // If no mount provided, we still allow floating mode as a fallback
-            const wantsFloating = this.settings.mode === 'floating' || !this._mount;
+            const wantsFloating = this.settings.mode === "floating" || !this._mount;
 
             if (!this._mount) {
-                const el = document.createElement('div');
-                el.className = `catchonika ${wantsFloating ? 'catchonika--floating' : 'catchonika--card'}`;
+                const el = document.createElement("div");
+                el.className = `catchonika ${wantsFloating ? "catchonika--floating" : "catchonika--card"}`;
                 el.innerHTML = this._uiHTML();
                 document.body.appendChild(el);
                 this._mount = el;
             } else {
-                this._mount.classList.add('catchonika');
-                this._mount.classList.add(this.settings.mode === 'card' ? 'catchonika--card' : 'catchonika--floating');
+                this._mount.classList.add("catchonika");
+                this._mount.classList.add(
+                    this.settings.mode === "card"
+                        ? "catchonika--card"
+                        : "catchonika--floating",
+                );
                 this._mount.innerHTML = this._uiHTML();
             }
 
-            this._statusEl = this._mount.querySelector('.catchonika__status');
-            this._bpmInput = this._mount.querySelector('.catchonika__bpm');
+            this._statusEl = this._mount.querySelector(".catchonika__status");
+            this._bpmInput = this._mount.querySelector(".catchonika__bpm");
             this._bpmInput.value = String(this.settings.defaultBpm);
-            this._idleInput = this._mount.querySelector('.catchonika__idle');
-            if (this._idleInput) this._idleInput.value = String(this.settings.takeIdleSeconds);
-            this._takesListEl = this._mount.querySelector('.catchonika__takes');
+            this._idleInput = this._mount.querySelector(".catchonika__idle");
+            if (this._idleInput)
+                this._idleInput.value = String(this.settings.takeIdleSeconds);
+            this._takesListEl = this._mount.querySelector(".catchonika__takes");
             this._renderTakesList();
         }
 
         _teardownUI() {
             if (!this._mount) return;
-            this._mount.innerHTML = '';
-            // Do not remove mount for card mode (caller owns container)
-            if (this._mount.classList.contains('catchonika--floating')) {
+            this._mount.innerHTML = "";
+            if (this._mount.classList.contains("catchonika--floating")) {
                 this._mount.remove();
             } else {
-                this._mount.classList.remove('catchonika', 'catchonika--card', 'catchonika--floating');
+                this._mount.classList.remove(
+                    "catchonika",
+                    "catchonika--card",
+                    "catchonika--floating",
+                );
             }
             this._mount = null;
         }
@@ -521,30 +770,31 @@
           <button class="catchonika__btn catchonika__btn--ghost" data-action="clear" title="Clear buffer">Clear</button>
         </div>
         <div class="catchonika__takes"></div>
-        <div class="catchonika__status" aria-live="polite">Starting…</div>
+        <div class="catchonika__status" aria-live="polite">Ready.</div>
       `;
         }
 
         _attachUIHandlers() {
             if (!this._mount) return;
-            this._mount.addEventListener('click', (e) => {
-                const btn = e.target.closest('[data-action]');
+            this._mount.addEventListener("click", (e) => {
+                const btn = e.target.closest("[data-action]");
                 if (!btn) return;
-                const bpm = parseFloat(this._bpmInput.value) || this.settings.defaultBpm;
-                if (btn.dataset.action === 'clear') this.clear();
-                if (btn.dataset.action === 'save-take') {
+                const bpm =
+                    parseFloat(this._bpmInput.value) || this.settings.defaultBpm;
+                if (btn.dataset.action === "clear") this.clear();
+                if (btn.dataset.action === "save-take") {
                     const idx = parseInt(btn.dataset.index, 10);
                     if (Number.isInteger(idx)) this.saveTake(idx, { bpm });
                 }
             });
 
-            this._mount.addEventListener('change', (e) => {
-                if (e.target && e.target.classList.contains('catchonika__idle')) {
+            this._mount.addEventListener("change", (e) => {
+                if (e.target && e.target.classList.contains("catchonika__idle")) {
                     const v = parseFloat(e.target.value);
                     if (Number.isFinite(v) && v > 0) {
                         this.settings.takeIdleSeconds = v;
-                        // If currently recording, reset the timer with the new value
                         if (this._currentTake) this._resetIdleTimer();
+                        this._schedulePersist();
                         this._status(`Auto-take idle: ${this.settings.takeIdleSeconds}s`);
                     }
                 }
