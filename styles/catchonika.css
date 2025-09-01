@@ -112,3 +112,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* === Takes list spacing === */
+.catchonika__takes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* vertical space between rows */
+    margin-top: 6px; /* space above the first take */
+}
+
+.catchonika__take {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.02); /* subtle background for clarity */
+}

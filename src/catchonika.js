@@ -1,6 +1,6 @@
 // Catchonika — default-on MIDI capture and one-click export to .mid
 // Card-ready: render neatly inside any container (tabs, panels, etc.)
-// v1.1.1 — fix: remove leading silence by zero-basing export times per take/range
+// v1.1.2 — fix: remove leading silence by zero-basing export times per take/range
 
 (() => {
     const PPQ = 128;
@@ -388,6 +388,16 @@
             }
 
             const tracks = [];
+            // Compute a global earliest note start across all tracks to preserve alignment
+            let _t0Global = Infinity;
+            for (const [, _notes] of notesByTrack.entries()) {
+                if (_notes && _notes.length) {
+                    const first = _notes[0].startMs;
+                    if (first < _t0Global) _t0Global = first;
+                }
+            }
+            if (!Number.isFinite(_t0Global)) _t0Global = 0;
+
             for (const [trackKey, notes] of notesByTrack.entries()) {
                 const track = new MidiWriter.Track();
                 track.setTempo(bpm, 0);
@@ -401,7 +411,7 @@
 
                 // ---- ZERO-BASE THE TAKE/RANGE ----
                 // Remove leading silence: find the earliest musical start in this track
-                const t0 = notes[0].startMs; // notes are sorted by startMs
+                const t0 = _t0Global; // notes are sorted by startMs
                 for (const n of notes) {
                     const startTick = msToTicks(n.startMs - t0, bpm, PPQ);
                     const durTick   = msToTicks(n.endMs - n.startMs, bpm, PPQ);
