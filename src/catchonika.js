@@ -1,4 +1,4 @@
-// Catchonika — default-on MIDI capture + one-click export to .mid
+// Catchonika — default-on MIDI capture and one-click export to .mid
 // Card-ready: render neatly inside any container (tabs, panels, etc.)
 // v1.1.0
 
@@ -20,7 +20,7 @@
     class Catchonika {
         /**
          * @param {Object} opts
-         * @param {HTMLElement|string} [opts.mount] Element or selector to render UI. If omitted, creates floating widget.
+         * @param {HTMLElement|string} [opts.mount] Element or selector to render UI. If omitted, creates a floating widget.
          * @param {"card"|"floating"} [opts.mode="card"] Presentation mode. "card" is ideal for tabs.
          * @param {number} [opts.bufferMinutes=30] Rolling buffer length.
          * @param {number} [opts.defaultBpm=120] Default BPM for export.
@@ -46,11 +46,18 @@
 
             this._renderUI();
             this._attachUIHandlers();
-            this._initMIDI();
+            void this._initMIDI();
             this._gcInterval = setInterval(() => this._gc(), 10_000);
+            // Ensure cleanup on the page unloaded and mark destroy as used internally
+            this._onBeforeUnload = () => this.destroy();
+            window.addEventListener('beforeunload', this._onBeforeUnload);
         }
 
         destroy() {
+            if (this._onBeforeUnload) {
+                window.removeEventListener('beforeunload', this._onBeforeUnload);
+                this._onBeforeUnload = null;
+            }
             if (this._midi) {
                 this._midi.onstatechange = null;
                 this._inputs.forEach(inp => inp.onmidimessage = null);
@@ -218,7 +225,10 @@
             const active = new Map();
             const sustain = new Map();
             const pending = new Map(); // ch -> Set(keys)
-            const ensureSet = (m, ch) => (m.has(ch) ? m.get(ch) : (m.set(ch, new Set()), m.get(ch)));
+            const ensureSet = (m, ch) => {
+                if (!m.has(ch)) m.set(ch, new Set());
+                return m.get(ch);
+            };
 
             const notes = [];
             const pushNote = (ch, note, tOn, tOff, vel) => {
@@ -287,8 +297,8 @@
             const tracks = [];
             for (const [trackKey, notes] of notesByTrack.entries()) {
                 const track = new MidiWriter.Track();
-                track.setTempo(bpm);
-                track.setTimeSignature(4, 4);
+                track.setTempo(bpm, 0);
+                track.setTimeSignature(4, 4, 24, 8);
                 track.addTrackName(`Catchonika ${trackKey}`);
 
                 for (const n of notes) {
@@ -303,11 +313,11 @@
                         channel: n.ch,
                         tick: startTick,
                     });
-                    track.addEvent(evt);
+                    track.addEvent(evt, undefined);
                 }
                 tracks.push(track);
             }
-            return new MidiWriter.Writer(tracks);
+            return new MidiWriter.Writer(tracks, {});
         }
 
         // --- Buffer hygiene ------------------------------------------------------
@@ -345,11 +355,7 @@
                 this._mount.innerHTML = this._uiHTML();
             }
 
-            this._rec = this._mount.querySelector('.catchonika__indicator');
             this._statusEl = this._mount.querySelector('.catchonika__status');
-            this._btnSave60 = this._mount.querySelector('[data-action="save-60"]');
-            this._btnSaveFull = this._mount.querySelector('[data-action="save-full"]');
-            this._btnClear = this._mount.querySelector('[data-action="clear"]');
             this._bpmInput = this._mount.querySelector('.catchonika__bpm');
             this._bpmInput.value = String(this.settings.defaultBpm);
         }

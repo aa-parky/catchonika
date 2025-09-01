@@ -90,7 +90,7 @@
             <h2 style="margin-top:0">About</h2>
             <p>Catchonika starts recording from all available Web MIDI inputs the moment this page loads. Save the last 60s or the entire session as a <code>.mid</code>.</p>
             <ul>
-                <li>Sustain (CC64) aware durations</li>
+                <li>Sustain (CC64) informed durations</li>
                 <li>Velocity preserved</li>
                 <li>Optional per-channel track export</li>
             </ul>
@@ -105,7 +105,7 @@
 <!-- Catchonika core -->
 <script src="../src/catchonika.js"></script>
 
-<!-- Tiny tabs + Catchonika boot -->
+<!-- Tiny tabs and Catchonika boot -->
 <script>
     (function () {
         // Tab wiring (accessible)
@@ -119,10 +119,7 @@
 
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
-                tabs.forEach(t => t.setAttribute('aria-selected', 'false'));
-                panels.forEach(p => p.setAttribute('aria-hidden', 'true'));
-                tab.setAttribute('aria-selected', 'true');
-                document.getElementById(tab.getAttribute('aria-controls')).setAttribute('aria-hidden', 'false');
+                activateTab(tab.id);
             });
         });
 
