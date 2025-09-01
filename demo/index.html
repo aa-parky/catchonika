@@ -2,21 +2,138 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <title>Catchonika demo</title>
+    <title>Catchonika — Tab Demo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Catchonika styles -->
     <link rel="stylesheet" href="../styles/catchonika.css" />
+
+    <!-- Minimal tab styles (scoped) -->
+    <style>
+        :root {
+            --tab-bg: #0f1216;
+            --tab-border: #1b222c;
+            --tab-text: #dbe7f3;
+            --tab-muted: #8aa2b8;
+            --tab-accent: #2b90ff;
+        }
+        body {
+            margin: 0;
+            font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            background: #0b0e12;
+            color: var(--tab-text);
+        }
+        .page {
+            max-width: 960px;
+            margin: 32px auto;
+            padding: 0 16px;
+        }
+        .tabs {
+            border: 1px solid var(--tab-border);
+            border-radius: 12px;
+            background: var(--tab-bg);
+            overflow: hidden;
+        }
+        .tabs__list {
+            display: flex;
+            gap: 2px;
+            border-bottom: 1px solid var(--tab-border);
+            background: linear-gradient(180deg, #0f1216, #0c1015);
+        }
+        .tabs__tab {
+            appearance: none;
+            border: 0;
+            padding: 10px 14px;
+            background: transparent;
+            color: var(--tab-muted);
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+        }
+        .tabs__tab[aria-selected="true"] {
+            color: var(--tab-text);
+            border-bottom-color: var(--tab-accent);
+        }
+        .tabs__panel {
+            display: none;
+            padding: 14px;
+        }
+        .tabs__panel[aria-hidden="false"] {
+            display: block;
+        }
+        .footer-note {
+            margin-top: 12px;
+            color: var(--tab-muted);
+            font-size: 12px;
+        }
+    </style>
 </head>
 <body>
-<!-- Optional mount point; if omitted, Catchonika creates a fixed bubble -->
-<div id="catchonika-mount"></div>
+<main class="page">
+    <h1>Catchonika</h1>
+    <p class="footer-note">Default-on MIDI capture. Lives happily in a tab.</p>
+
+    <section class="tabs" id="catchonika-tabs">
+        <!-- Tablist -->
+        <div class="tabs__list" role="tablist" aria-label="Catchonika sections">
+            <button id="tab-rec"  class="tabs__tab" role="tab" aria-controls="panel-rec"  aria-selected="true">Recorder</button>
+            <button id="tab-about" class="tabs__tab" role="tab" aria-controls="panel-about" aria-selected="false">About</button>
+        </div>
+
+        <!-- Panels -->
+        <div id="panel-rec" class="tabs__panel" role="tabpanel" aria-labelledby="tab-rec" aria-hidden="false">
+            <!-- Catchonika mounts here as a CARD -->
+            <div id="catchonika-card"></div>
+        </div>
+
+        <div id="panel-about" class="tabs__panel" role="tabpanel" aria-labelledby="tab-about" aria-hidden="true">
+            <h2 style="margin-top:0">About</h2>
+            <p>Catchonika starts recording from all available Web MIDI inputs the moment this page loads. Save the last 60s or the entire session as a <code>.mid</code>.</p>
+            <ul>
+                <li>Sustain (CC64) aware durations</li>
+                <li>Velocity preserved</li>
+                <li>Optional per-channel track export</li>
+            </ul>
+            <p class="footer-note">Tip: Web MIDI requires a secure context (https or localhost) in most browsers.</p>
+        </div>
+    </section>
+</main>
 
 <!-- MidiWriterJS (global 'MidiWriter') -->
 <script src="https://unpkg.com/midi-writer-js@3.1.1"></script>
-<!-- Catchonika -->
+<!-- Catchonika core -->
 <script src="../src/catchonika.js"></script>
+
+<!-- Tiny tabs + Catchonika boot -->
 <script>
-    // Start immediately (default-on)
-    new window.Catchonika({ mount: '#catchonika-mount', bufferMinutes: 60, defaultBpm: 120, groupByChannel: false });
+    (function () {
+        // Tab wiring (accessible)
+        const tabs = document.querySelectorAll('.tabs__tab');
+        const panels = document.querySelectorAll('.tabs__panel');
+
+        function activateTab(nextId) {
+            tabs.forEach(t => t.setAttribute('aria-selected', String(t.id === nextId)));
+            panels.forEach(p => p.setAttribute('aria-hidden', String(p.id !== document.getElementById(nextId).getAttribute('aria-controls'))));
+        }
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.setAttribute('aria-selected', 'false'));
+                panels.forEach(p => p.setAttribute('aria-hidden', 'true'));
+                tab.setAttribute('aria-selected', 'true');
+                document.getElementById(tab.getAttribute('aria-controls')).setAttribute('aria-hidden', 'false');
+            });
+        });
+
+        // Catchonika: render as a CARD in the Recorder panel
+        new window.Catchonika({
+            mount: '#catchonika-card',
+            mode: 'card',
+            bufferMinutes: 60,
+            defaultBpm: 120,
+            groupByChannel: false
+        });
+    })();
 </script>
 
 <noscript>Enable JavaScript for Catchonika.</noscript>
