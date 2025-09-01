@@ -1,5 +1,4 @@
-// Catchonika — default-on MIDI capture and one-click export to .mid
-// Starts recording immediately, listens to all MIDI inputs, and can
+// Catchonika — default-on MIDI capture and one-click export to .mid-Starts recording immediately, listens to all MIDI inputs, and can
 // save "last N seconds" or the full session. No framework required.
 //
 // Requires MidiWriterJS in either global scope (via <script>) or as an import.
@@ -183,7 +182,7 @@
                 return;
             }
 
-            // AFTERTOUCH (channel or poly), program changes, etc. can be captured for future
+            // AFTERTOUCH (channel or poly), program changes, etc. can be captured for the future
             this._events.push({ t, type: 'raw', bytes: Array.from(data), ch, inputId, inputName });
         }
 
@@ -192,15 +191,15 @@
             const active = this._active.get(key);
 
             if (!active) {
-                // If we never saw noteon (device race), still log the off.
+                // If we never saw the noteon (device race), still log the off.
                 this._events.push({ t, type: 'noteoff', ch, note, inputId, inputName });
                 return;
             }
 
             if (sustainDown(ch)) {
-                // Defer the release until pedal lifts
+                // Defer the release until the pedal lifts
                 pendKeySet(ch).add(key);
-                // log the off event for completeness, but keep active until sustain release
+                // log the off event for completeness but keep active until sustain release
                 this._events.push({ t, type: 'noteoff_deferred', ch, note, inputId, inputName });
             } else {
                 this._events.push({ t, type: 'noteoff', ch, note, inputId, inputName });
@@ -211,7 +210,7 @@
         // --- Export --------------------------------------------------------------
 
         /**
-         * Save the last N seconds (default 60s) as a .mid file.
+         * Save the last N seconds (default 60s) as a .mid-file.
          */
         saveLast(seconds = 60, opts = {}) {
             const endMs = ts() - this._start;
@@ -220,7 +219,7 @@
         }
 
         /**
-         * Save the full session as a .mid file.
+         * Save the full session as a .mid-file.
          */
         saveFull(opts = {}) {
             const endMs = ts() - this._start;
@@ -323,7 +322,7 @@
                 }
             }
 
-            // Close any still-active or pending notes at window end
+            // Close any still-active or pending notes at the window end
             for (const [key, st] of active.entries()) {
                 const [chStr, noteStr] = key.split(':');
                 pushNote(parseInt(chStr, 10), parseInt(noteStr, 10), st.tOn, windowEnd, st.vel);
