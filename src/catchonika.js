@@ -1,4 +1,4 @@
-// Catchonika — default-on MIDI capture + one-click export to .mid
+// Catchonika — default-on MIDI capture and one-click export to .mid
 // Starts recording immediately, listens to all MIDI inputs, and can
 // save "last N seconds" or the full session. No framework required.
 //
