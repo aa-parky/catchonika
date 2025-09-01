@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Catchonika demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../styles/catchonika.css" />
+</head>
+<body>
+<!-- Optional mount point; if omitted, Catchonika creates a fixed bubble -->
+<div id="catchonika-mount"></div>
+
+<!-- MidiWriterJS (global 'MidiWriter') -->
+<script src="https://unpkg.com/midi-writer-js@3.1.1"></script>
+<!-- Catchonika -->
+<script src="../src/catchonika.js"></script>
+<script>
+    // Start immediately (default-on)
+    new window.Catchonika({ mount: '#catchonika-mount', bufferMinutes: 60, defaultBpm: 120, groupByChannel: false });
+</script>
+
+<noscript>Enable JavaScript for Catchonika.</noscript>
+</body>
+</html>

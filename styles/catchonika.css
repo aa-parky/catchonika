@@ -1,0 +1,91 @@
+/* BEM: .catchonika = block */
+.catchonika {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+    z-index: 9999;
+
+    font: 12px/1.2 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    color: #dbe7f3;
+    background: linear-gradient(180deg, #0f1216, #0b0e12);
+    border: 1px solid #1b222c;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    min-width: 240px;
+}
+
+.catchonika__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.catchonika__row--controls {
+    justify-content: space-between;
+}
+
+.catchonika__indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ff3355;
+    box-shadow: 0 0 0 0 rgba(255, 51, 85, 0.7);
+    animation: catchonika-pulse 1.8s infinite;
+}
+
+@keyframes catchonika-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255, 51, 85, 0.6); }
+    70%  { box-shadow: 0 0 0 12px rgba(255, 51, 85, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 51, 85, 0); }
+}
+
+.catchonika__title {
+    font-weight: 700;
+    letter-spacing: 0.4px;
+}
+
+.catchonika__bpm-wrap {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #9fb3c8;
+}
+
+.catchonika__bpm {
+    width: 64px;
+    background: #0f141a;
+    color: #e7f0fa;
+    border: 1px solid #233041;
+    border-radius: 8px;
+    padding: 4px 6px;
+    outline: none;
+}
+
+.catchonika__btn {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid #213041;
+    background: #15202b;
+    color: #dbe7f3;
+    cursor: pointer;
+    transition: transform .06s ease, background .2s ease, border-color .2s ease;
+    user-select: none;
+}
+.catchonika__btn:hover { background: #182635; }
+.catchonika__btn:active { transform: translateY(1px); }
+
+.catchonika__btn--ghost {
+    background: transparent;
+    color: #9fb3c8;
+}
+
+.catchonika__status {
+    margin-top: 6px;
+    color: #8aa2b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
