@@ -1,4 +1,4 @@
-/* Base block */
+/* Catchonika – lean dark theme */
 .catchonika {
     --c-bg: #0f1216;
     --c-bg-2: #0b0e12;
@@ -10,74 +10,81 @@
     --c-btn-bg-hover: #182635;
     --c-rec: #ff3355;
 
-    font: 12px/1.2 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    font: 12px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
     color: var(--c-text);
 }
 
-/* Card mode – ideal for tabs/panels */
+/* Card – fixed height + scroll */
 .catchonika--card {
-    display: block;
+    display: flex;
+    flex-direction: column;
     width: 97%;
     background: linear-gradient(180deg, var(--c-bg), var(--c-bg-2));
     border: 1px solid var(--c-border);
     border-radius: 12px;
     padding: 10px 12px;
+    gap: 10px;
+
+    height: 250px;          /* Fixed height as requested */
+    overflow: hidden;       /* Contain internals; list itself scrolls */
 }
 
-/* Floating mode – optional fallback */
-.catchonika--floating {
-    position: fixed;
-    left: 16px;
-    bottom: 16px;
-    z-index: 9999;
-    background: linear-gradient(180deg, var(--c-bg), var(--c-bg-2));
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 10px 12px;
-    min-width: 240px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-}
-
-.catchonika__row {
+/* Header / Title row */
+.catchonika__header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-}
-
-.catchonika__row--controls {
     justify-content: space-between;
+    gap: 10px;
 }
 
-.catchonika__indicator {
-    width: 10px;
-    height: 10px;
+/* Small inline controls row */
+.catchonika__controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Buttons */
+.catchonika__btn {
+    background: var(--c-btn-bg);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: 8px 14px;         /* top/bottom, left/right */
+    cursor: pointer;
+    user-select: none;
+    transition: background 120ms ease, transform 80ms ease;
+}
+.catchonika__btn:hover { background: var(--c-btn-bg-hover); }
+.catchonika__btn:active { transform: translateY(1px); }
+
+.catchonika__btn.is-primary { border-color: #2b3b50; }
+.catchonika__btn.is-danger  { border-color: #4a1e25; color: #ffdbe1; }
+
+/* Record dot */
+.catchonika__rec-dot {
+    width: 10px; height: 10px;
     border-radius: 50%;
     background: var(--c-rec);
-    box-shadow: 0 0 0 0 rgba(255,51,85,0.7);
-    animation: catchonika-pulse 1.8s infinite;
+    box-shadow: 0 0 0 2px rgba(255,51,85,0.15);
 }
 
-@keyframes catchonika-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(255,51,85,0.6); }
-    70%  { box-shadow: 0 0 0 12px rgba(255,51,85,0); }
-    100% { box-shadow: 0 0 0 0 rgba(255,51,85,0); }
-}
-
-.catchonika__title {
-    font-weight: 700;
-    letter-spacing: 0.033em;
-}
-
-.catchonika__bpm-wrap {
-    margin-left: auto;
+/* Status line + clear button share a row */
+.catchonika__footer {
     display: flex;
     align-items: center;
-    gap: 6px;
-    color: var(--c-muted);
+    justify-content: space-between;
+    gap: 10px;
 }
 
-.catchonika__bpm {
+/* Subdued text */
+.catchonika__muted { color: var(--c-muted); }
+.catchonika__muted-2 { color: var(--c-muted-2); }
+
+/* Numeric inputs (e.g., BPM) */
+.catchonika__bpm,
+.catchonika__number {
     width: 64px;
     background: #0f141a;
     color: #e7f0fa;
@@ -87,46 +94,125 @@
     outline: none;
 }
 
-.catchonika__btn {
-    padding: 8px 12px;
-    border-radius: 10px;
-    border: 1px solid #213041;
-    background: var(--c-btn-bg);
-    color: var(--c-text);
-    cursor: pointer;
-    transition: transform .06s ease, background .2s ease, border-color .2s ease;
-    user-select: none;
+/* TAKES LIST ====================================================== */
+/* Only the list scrolls so headers stay visible */
+.catchonika__takes {
+    flex: 1;
+    min-height: 0;      /* critical so this child can actually shrink & scroll */
+    overflow: auto;
+    padding-right: 4px; /* keep scrollbar off content */
 }
-.catchonika__btn:hover { background: var(--c-btn-bg-hover); }
-.catchonika__btn:active { transform: translateY(1px); }
 
-.catchonika__btn--ghost {
-    background: transparent;
+/* Optional: subtle, theme-friendly scrollbar */
+.catchonika__takes::-webkit-scrollbar { width: 10px; }
+.catchonika__takes::-webkit-scrollbar-track { background: #0a0d12; border-radius: 10px; }
+.catchonika__takes::-webkit-scrollbar-thumb { background: #1b2735; border-radius: 10px; }
+.catchonika__takes::-webkit-scrollbar-thumb:hover { background: #223245; }
+
+/* Takes list layout */
+.catchonika__take-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+/* Single take row */
+.catchonika__take {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Left cluster: title / timing */
+.catchonika__take-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0; /* allow ellipsis to work */
+}
+
+/* Timing chips */
+.catchonika__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    border: 1px solid #223043;
+    background: #0f141a;
+    color: #e7f0fa;
+    white-space: nowrap;
+}
+.catchonika__chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #4b99ff;
+}
+
+/* Duration (center column in your layout) */
+.catchonika__take-duration {
+    justify-self: end;
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
     color: var(--c-muted);
 }
 
-.catchonika__status {
-    margin-top: 6px;
-    color: var(--c-muted-2);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* === Takes list spacing === */
-.catchonika__takes {
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* vertical space between rows */
-    margin-top: 6px; /* space above the first take */
-}
-
-.catchonika__take {
+/* Right: actions */
+.catchonika__take-actions {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 4px 6px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.02); /* subtle background for clarity */
+    gap: 6px;
 }
 
+/* Text truncation helper */
+.u-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Small labels */
+.catchonika__label {
+    font-size: 11px;
+    color: var(--c-muted);
+}
+
+/* Badges */
+.catchonika__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #0e141b;
+    border: 1px solid #223043;
+    color: #b7c8da;
+}
+
+/* Minimal tables (if used anywhere) */
+.catchonika table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.catchonika th,
+.catchonika td {
+    border-bottom: 1px solid var(--c-border);
+    padding: 6px 4px;
+    text-align: left;
+}
+.catchonika th { color: var(--c-muted); font-weight: 600; }
+
+/* Utility spacing */
+.u-gap-4 { gap: 4px; }
+.u-gap-6 { gap: 6px; }
+.u-gap-8 { gap: 8px; }
+.u-mt-6 { margin-top: 6px; }
+.u-mt-10 { margin-top: 10px; }
