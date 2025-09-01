@@ -25,6 +25,7 @@
          * @param {number} [opts.bufferMinutes=30] Rolling buffer length.
          * @param {number} [opts.defaultBpm=120] Default BPM for export.
          * @param {boolean} [opts.groupByChannel=false] Track per MIDI channel on export.
+         * @param {number} [opts.takeIdleSeconds=3] Seconds of inactivity to end an auto-take.
          */
         constructor(opts = {}) {
             this.settings = {
@@ -32,6 +33,7 @@
                 defaultBpm: opts.defaultBpm ?? DEFAULT_BPM,
                 groupByChannel: opts.groupByChannel ?? false,
                 mode: opts.mode ?? 'card',
+                takeIdleSeconds: opts.takeIdleSeconds ?? 3,
             };
 
             this._mount = typeof opts.mount === 'string' ? document.querySelector(opts.mount) : opts.mount;
@@ -43,6 +45,11 @@
             this._active = new Map();      // "ch:note" -> {tOn, vel, inputId}
             this._sustain = new Map();     // ch -> bool
             this._pendingRelease = new Map(); // ch -> Set(keys)
+
+            // Auto-take state
+            this._takes = [];              // [{ startMs, endMs }]
+            this._currentTake = null;      // { startMs, lastActivityMs }
+            this._idleTimer = null;        // inactivity timeout id
 
             this._renderUI();
             this._attachUIHandlers();
@@ -61,6 +68,10 @@
             if (this._midi) {
                 this._midi.onstatechange = null;
                 this._inputs.forEach(inp => inp.onmidimessage = null);
+            }
+            if (this._idleTimer) {
+                clearTimeout(this._idleTimer);
+                this._idleTimer = null;
             }
             clearInterval(this._gcInterval);
             this._teardownUI();
@@ -112,6 +123,9 @@
                 return this._pendingRelease.get(c);
             };
 
+            // Mark activity for auto-take idle tracking
+            this._markActivity(t);
+
             if (type === 0x90) {
                 const note = data[1];
                 const vel = data[2] || 0;
@@ -138,6 +152,13 @@
                     const wasDown = sustainDown(ch);
                     const nowDown = val >= 64;
                     setSustain(ch, nowDown);
+
+                    // Sustain pressed: start a new take if none active
+                    if (!wasDown && nowDown) {
+                        this._startTake(t);
+                    }
+
+                    // Sustain released: flush deferred note-offs
                     if (wasDown && !nowDown) {
                         const keys = pendKeySet(ch);
                         keys.forEach(key => {
@@ -180,17 +201,88 @@
             }
         }
 
-        // --- Export --------------------------------------------------------------
+        // --- Auto-takes ----------------------------------------------------------
 
-        saveLast(seconds = 60, opts = {}) {
-            const endMs = ts() - this._start;
-            const startMs = Math.max(0, endMs - (seconds * 1000));
-            return this._saveRange(startMs, endMs, { label: `last-${seconds}s`, ...opts });
+        saveTake(index, opts = {}) {
+            const take = this._takes?.[index];
+            if (!take) {
+                this._status(`No take #${index + 1}`);
+                return;
+            }
+            const bpmToUse = Number.isFinite(opts.bpm) ? opts.bpm : (parseFloat(this._bpmInput?.value) || this.settings.defaultBpm);
+            return this._saveRange(take.startMs, take.endMs ?? (ts() - this._start), { bpm: bpmToUse, label: `take-${index + 1}`, ...opts });
         }
 
-        saveFull(opts = {}) {
-            const endMs = ts() - this._start;
-            return this._saveRange(0, endMs, { label: `session`, ...opts });
+        _startTake(t) {
+            if (this._currentTake) return;
+            this._currentTake = { startMs: t, lastActivityMs: t };
+            this._resetIdleTimer();
+            this._renderTakesList();
+            this._status(`Take ${this._takes.length + 1} started`);
+        }
+
+        _endTake() {
+            if (!this._currentTake) return;
+            if (this._idleTimer) {
+                clearTimeout(this._idleTimer);
+                this._idleTimer = null;
+            }
+            const endMs = this._currentTake.lastActivityMs ?? (ts() - this._start);
+            this._takes.push({ startMs: this._currentTake.startMs, endMs });
+            const takeNum = this._takes.length;
+            this._currentTake = null;
+            this._renderTakesList();
+            this._status(`Take ${takeNum} ended`);
+        }
+
+        _markActivity(t) {
+            if (!this._currentTake) return;
+            this._currentTake.lastActivityMs = t;
+            this._resetIdleTimer();
+        }
+
+        _resetIdleTimer() {
+            if (!this._currentTake) return;
+            if (this._idleTimer) clearTimeout(this._idleTimer);
+            const idleMs = Math.max(500, (this.settings.takeIdleSeconds ?? 3) * 1000);
+            this._idleTimer = setTimeout(() => this._endTake(), idleMs);
+        }
+
+        _renderTakesList() {
+            if (!this._takesListEl) return;
+            const fmt = (ms) => this._formatMs(ms);
+            const rows = [];
+            this._takes.forEach((t, i) => {
+                const length = t.endMs - t.startMs;
+                rows.push(
+                    `<div class="catchonika__take">
+                        <span class="catchonika__take-label">Take ${i + 1}</span>
+                        <span class="catchonika__take-time">${fmt(t.startMs)} – ${fmt(t.endMs)} (${fmt(length)})</span>
+                        <button class="catchonika__btn catchonika__btn--small" data-action="save-take" data-index="${i}" title="Save this take">Save</button>
+                    </div>`
+                );
+            });
+            if (this._currentTake) {
+                const i = this._takes.length;
+                const t = this._currentTake;
+                const now = t.lastActivityMs;
+                const length = now - t.startMs;
+                rows.push(
+                    `<div class="catchonika__take catchonika__take--active">
+                        <span class="catchonika__take-label">Take ${i + 1}</span>
+                        <span class="catchonika__take-time">${fmt(t.startMs)} – … (${fmt(length)})</span>
+                        <span class="catchonika__take-badge">recording…</span>
+                    </div>`
+                );
+            }
+            this._takesListEl.innerHTML = rows.join('') || `<div class="catchonika__take-empty">No takes yet. Press sustain to start a take.</div>`;
+        }
+
+        _formatMs(ms) {
+            const totalSeconds = Math.max(0, Math.round(ms / 1000));
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return `${m}:${String(s).padStart(2, '0')}`;
         }
 
         _saveRange(startMs, endMs, { bpm, label } = {}) {
@@ -334,6 +426,16 @@
             this._active.clear();
             this._sustain.clear();
             this._pendingRelease.clear();
+
+            // Clear takes and timers
+            if (this._idleTimer) {
+                clearTimeout(this._idleTimer);
+                this._idleTimer = null;
+            }
+            this._currentTake = null;
+            this._takes = [];
+            this._renderTakesList();
+
             this._status('Cleared buffer.');
         }
 
@@ -358,6 +460,10 @@
             this._statusEl = this._mount.querySelector('.catchonika__status');
             this._bpmInput = this._mount.querySelector('.catchonika__bpm');
             this._bpmInput.value = String(this.settings.defaultBpm);
+            this._idleInput = this._mount.querySelector('.catchonika__idle');
+            if (this._idleInput) this._idleInput.value = String(this.settings.takeIdleSeconds);
+            this._takesListEl = this._mount.querySelector('.catchonika__takes');
+            this._renderTakesList();
         }
 
         _teardownUI() {
@@ -380,12 +486,14 @@
           <label class="catchonika__bpm-wrap">BPM
             <input class="catchonika__bpm" type="number" min="30" max="300" step="1" value="${this.settings.defaultBpm}">
           </label>
+          <label class="catchonika__idle-wrap" title="Seconds of no MIDI activity to end a take">Idle s
+            <input class="catchonika__idle" type="number" min="1" max="30" step="0.5" value="${this.settings.takeIdleSeconds}">
+          </label>
         </div>
         <div class="catchonika__row catchonika__row--controls">
-          <button class="catchonika__btn" data-action="save-60" title="Save last 60 seconds">Save 60s</button>
-          <button class="catchonika__btn" data-action="save-full" title="Save full session">Save Full</button>
           <button class="catchonika__btn catchonika__btn--ghost" data-action="clear" title="Clear buffer">Clear</button>
         </div>
+        <div class="catchonika__takes"></div>
         <div class="catchonika__status" aria-live="polite">Starting…</div>
       `;
         }
@@ -396,9 +504,23 @@
                 const btn = e.target.closest('[data-action]');
                 if (!btn) return;
                 const bpm = parseFloat(this._bpmInput.value) || this.settings.defaultBpm;
-                if (btn.dataset.action === 'save-60') this.saveLast(60, { bpm });
-                if (btn.dataset.action === 'save-full') this.saveFull({ bpm });
                 if (btn.dataset.action === 'clear') this.clear();
+                if (btn.dataset.action === 'save-take') {
+                    const idx = parseInt(btn.dataset.index, 10);
+                    if (Number.isInteger(idx)) this.saveTake(idx, { bpm });
+                }
+            });
+
+            this._mount.addEventListener('change', (e) => {
+                if (e.target && e.target.classList.contains('catchonika__idle')) {
+                    const v = parseFloat(e.target.value);
+                    if (Number.isFinite(v) && v > 0) {
+                        this.settings.takeIdleSeconds = v;
+                        // If currently recording, reset the timer with the new value
+                        if (this._currentTake) this._resetIdleTimer();
+                        this._status(`Auto-take idle: ${this.settings.takeIdleSeconds}s`);
+                    }
+                }
             });
         }
 
