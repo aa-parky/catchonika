@@ -1,6 +1,6 @@
 // Catchonika — default-on MIDI capture and one-click export to .mid
 // Card-ready: render neatly inside any container (tabs, panels, etc.)
-// v1.1.0
+// v1.1.1 — fix: remove leading silence by zero-basing export times per take/range
 
 (() => {
     const PPQ = 128;
@@ -68,6 +68,7 @@
             if (this._midi) {
                 this._midi.onstatechange = null;
                 this._inputs.forEach(inp => inp.onmidimessage = null);
+                this._midi = null; // ensure GC of MIDI access
             }
             if (this._idleTimer) {
                 clearTimeout(this._idleTimer);
@@ -291,7 +292,7 @@
                 .filter(e => e.t >= startMs && e.t <= endMs)
                 .sort((a, b) => a.t - b.t);
 
-            const notesByTrack = this._reconstructNotes(events, startMs, endMs);
+            const notesByTrack = self._reconstructNotes ? self._reconstructNotes(events, startMs, endMs) : this._reconstructNotes(events, startMs, endMs);
             const writer = this._buildMidi(notesByTrack, bpmToUse);
 
             const file = writer.buildFile();
@@ -393,8 +394,16 @@
                 track.setTimeSignature(4, 4, 24, 8);
                 track.addTrackName(`Catchonika ${trackKey}`);
 
+                if (!notes.length) {
+                    tracks.push(track);
+                    continue;
+                }
+
+                // ---- ZERO-BASE THE TAKE/RANGE ----
+                // Remove leading silence: find the earliest musical start in this track
+                const t0 = notes[0].startMs; // notes are sorted by startMs
                 for (const n of notes) {
-                    const startTick = msToTicks(n.startMs, bpm, PPQ);
+                    const startTick = msToTicks(n.startMs - t0, bpm, PPQ);
                     const durTick   = msToTicks(n.endMs - n.startMs, bpm, PPQ);
                     const velocity01_100 = clamp(Math.round((n.vel / 127) * 100), 1, 100);
 
