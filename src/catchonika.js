@@ -281,6 +281,8 @@
                 const note = data[1];
                 const vel = data[2] || 0;
                 if (vel > 0) {
+                    // Auto-start take on the first played note
+                    if (!this._currentTake) this._startTake(t);
                     this._events.push({
                         t,
                         type: "noteon",
@@ -322,6 +324,8 @@
             if (type === 0xb0) {
                 const cc = data[1];
                 const val = data[2] ?? 0;
+                // Auto-start take on first meaningful CC (exclude sustain which already starts takes)
+                if (!this._currentTake && cc !== 64) this._startTake(t);
                 this._events.push({ t, type: "cc", ch, cc, val, inputId, inputName });
                 this._schedulePersist();
 
@@ -360,6 +364,7 @@
             }
 
             if (type === 0xe0) {
+                if (!this._currentTake) this._startTake(t);
                 const lsb = data[1] ?? 0;
                 const msb = data[2] ?? 0;
                 const value = ((msb << 7) | lsb) - 8192;
@@ -503,7 +508,7 @@
             }
             this._takesListEl.innerHTML =
                 rows.join("") ||
-                `<div class="catchonika__take-empty">No takes yet. Press sustain to start a take.</div>`;
+                `<div class="catchonika__take-empty">No takes yet. Press sustain or just play to start a take.</div>`;
         }
 
         _fmtClock(epochMs) {
