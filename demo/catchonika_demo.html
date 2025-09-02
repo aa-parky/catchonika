@@ -2,14 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Tonika Bundle</title>
-    <!-- 2. SHARED COMPONENT STYLES (Buttons, Inputs, etc.) -->
-    <link rel="stylesheet" href="../styles/tonika-components.css" />
-    <!-- 1. CORE STYLES (Variables for Theming) -->
-    <link rel="stylesheet" href="../styles/tonika-core.css" />
-    <!-- 3. PAGE-SPECIFIC LAYOUT -->
-    <link rel="stylesheet" href="../styles/layout.css" />
-    <!-- 1. CORE STYLES (Variables for Theming) -->
+    <title>Catchonika Demo</title>
+
+    <!-- ===================================================================
+         TONIKA DESIGN SYSTEM - LINKED DIRECTLY FROM GITHUB
+
+         These CSS files are loaded directly from the main Tonika design
+         system repository. This ensures you're always testing against
+         the latest design system without needing to manually sync files.
+
+         Replace [USERNAME] and [REPO-NAME] with actual GitHub details.
+         ================================================================== -->
+
+    <!-- 1) Core variables first -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/aa-parky/tonika@main/css/tonika-core.css" />
+
+    <!-- 2) Shared components -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/aa-parky/tonika@main/css/tonika-components.css" />
+
+    <!-- 3) Layout -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/aa-parky/tonika@main/css/layout.css" />
+
+    <!-- 4. YOUR MODULE'S CSS (Local file) -->
+    <link rel="stylesheet" href="../styles/catchonika.css" />
+
 </head>
 
 <body class="tonika-theme-dark">
@@ -31,8 +50,6 @@
 
     <div class="tab-content">
         <section class="active">
-            <!-- Catchonika styles -->
-            <link rel="stylesheet" href="../styles/catchonika.css" />
             <!-- In-page mount -->
             <div id="catchonika-card"></div>
         </section>
