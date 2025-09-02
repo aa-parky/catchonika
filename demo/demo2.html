@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tonika Module Development Demo</title>
+
+    <!-- ===================================================================
+         TONIKA DESIGN SYSTEM - LINKED DIRECTLY FROM GITHUB
+
+         These CSS files are loaded directly from the main Tonika design
+         system repository. This ensures you're always testing against
+         the latest design system without needing to manually sync files.
+
+         Replace [USERNAME] and [REPO-NAME] with actual GitHub details.
+         ================================================================== -->
+
+    <!-- 1. CORE STYLES (Variables for Theming) - MUST BE FIRST -->
+    <link rel="stylesheet" href="https://raw.githubusercontent.com/[USERNAME]/[REPO-NAME]/main/styles/tonika-core.css" />
+
+    <!-- 2. SHARED COMPONENT STYLES (Buttons, Inputs, etc.) -->
+    <link rel="stylesheet" href="https://raw.githubusercontent.com/[USERNAME]/[REPO-NAME]/main/styles/tonika-components.css" />
+
+    <!-- 3. PAGE-SPECIFIC LAYOUT -->
+    <link rel="stylesheet" href="https://raw.githubusercontent.com/[USERNAME]/[REPO-NAME]/main/styles/layout.css" />
+
+    <!-- 4. YOUR MODULE'S CSS (Local file) -->
+    <link rel="stylesheet" href="styles/catchonika.css" />
+
+    <style>
+        /* Optional: Add any demo-specific overrides here */
+        .demo-note {
+            background: var(--color-bg-secondary);
+            border: var(--border-width) solid var(--color-border);
+            border-radius: var(--border-radius-md);
+            padding: var(--spacing-md);
+            margin: var(--spacing-lg) 0;
+            color: var(--color-text-muted);
+            font-size: var(--font-size-sm);
+        }
+    </style>
+</head>
+
+<body class="tonika-theme-dark">
+
+<header>
+    <h1>Tonika Module Development Demo</h1>
+</header>
+
+<main class="tonika-container">
+
+    <div class="demo-note">
+        <strong>Development Note:</strong> This demo loads the Tonika design system directly from GitHub,
+        ensuring you're always testing against the latest version. Your module's CSS should only contain
+        layout and structural styles unique to your module.
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="active" onclick="openTab(0)">Your Module</button>
+        <button onclick="openTab(1)">Light Theme Test</button>
+        <button onclick="openTab(2)">Component Gallery</button>
+        <button onclick="openTab(3)">Layout Test</button>
+        <button onclick="openTab(4)">Documentation</button>
+    </div>
+
+    <div class="tab-content">
+        <!-- Tab 1: Your Module -->
+        <section class="active">
+            <div id="your-module-mount"></div>
+        </section>
+
+        <!-- Tab 2: Light Theme Test -->
+        <section>
+            <div class="demo-note">
+                <p>Switch the body class from <code>tonika-theme-dark</code> to <code>tonika-theme-light</code>
+                    (or remove it entirely) to test your module in light mode.</p>
+                <button class="tonika-btn" onclick="toggleTheme()">Toggle Theme</button>
+            </div>
+            <div id="theme-test-mount"></div>
+        </section>
+
+        <!-- Tab 3: Component Gallery -->
+        <section>
+            <h3>Tonika Component Gallery</h3>
+            <div style="display: grid; gap: var(--spacing-lg); grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+
+                <div class="tonika-module">
+                    <h4>Buttons</h4>
+                    <div style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
+                        <button class="tonika-btn">Default</button>
+                        <button class="tonika-btn tonika-btn--primary">Primary</button>
+                        <button class="tonika-btn tonika-btn--danger">Danger</button>
+                    </div>
+                </div>
+
+                <div class="tonika-module">
+                    <h4>Inputs</h4>
+                    <div style="display: flex; flex-direction: column; gap: var(--spacing-sm);">
+                        <input class="tonika-input" type="text" placeholder="Text input">
+                        <input class="tonika-input" type="number" placeholder="120" style="width: 80px;">
+                        <select class="tonika-select">
+                            <option>Select option...</option>
+                            <option>Option 1</option>
+                            <option>Option 2</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="tonika-module">
+                    <h4>Typography</h4>
+                    <p>Normal text</p>
+                    <p class="tonika-text-muted">Muted text</p>
+                    <small>Small text</small>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Tab 4: Layout Test -->
+        <section>
+            <h3>Layout Test</h3>
+            <div style="display: grid; gap: var(--spacing-lg); grid-template-columns: 1fr 1fr;">
+                <div class="tonika-module">
+                    <h4>Card 1</h4>
+                    <p>This demonstrates the standard module card layout.</p>
+                    <button class="tonika-btn tonika-btn--primary">Action</button>
+                </div>
+                <div class="tonika-module">
+                    <h4>Card 2</h4>
+                    <p>Cards automatically adapt to the current theme.</p>
+                    <button class="tonika-btn">Another Action</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab 5: Documentation -->
+        <section>
+            <div class="tonika-module">
+                <h3>Module Development Guidelines</h3>
+                <h4>CSS Structure</h4>
+                <ul>
+                    <li><strong>Use BEM naming:</strong> <code>.yourmodule</code>, <code>.yourmodule__element</code>, <code>.yourmodule--modifier</code></li>
+                    <li><strong>Root container:</strong> Always use <code>class="tonika-module yourmodule yourmodule--card"</code></li>
+                    <li><strong>Use global components:</strong> <code>.tonika-btn</code>, <code>.tonika-input</code>, <code>.tonika-select</code></li>
+                    <li><strong>Use CSS variables:</strong> <code>var(--color-bg-primary)</code>, <code>var(--spacing-md)</code>, etc.</li>
+                </ul>
+
+                <h4>JavaScript Integration</h4>
+                <ul>
+                    <li>Mount your module with: <code>new YourModule({ mount: "#element-id" })</code></li>
+                    <li>Generate HTML with proper BEM classes</li>
+                    <li>Use global CSS classes for common elements</li>
+                </ul>
+
+                <h4>Testing</h4>
+                <ul>
+                    <li>Test in both light and dark themes</li>
+                    <li>Ensure responsive behavior</li>
+                    <li>Verify accessibility with screen readers</li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <!-- Keyboard placeholder -->
+    <div class="roll88">
+        <div style="background: var(--color-bg-secondary); padding: var(--spacing-lg); border-radius: var(--border-radius-md); text-align: center;">
+            <span class="tonika-text-muted">Piano Roll / Keyboard Component Area</span>
+        </div>
+    </div>
+</main>
+
+<footer>
+    <p>© 2025 Tonika Module Development Demo</p>
+</footer>
+
+<script>
+    function openTab(index) {
+        const tabs = document.querySelectorAll('.tabs button');
+        const sections = document.querySelectorAll('.tab-content section');
+
+        tabs.forEach((tab, i) => {
+            tab.classList.toggle('active', i === index);
+            sections[i].classList.toggle('active', i === index);
+        });
+    }
+
+    function toggleTheme() {
+        const body = document.body;
+        if (body.classList.contains('tonika-theme-dark')) {
+            body.classList.remove('tonika-theme-dark');
+            body.classList.add('tonika-theme-light');
+        } else {
+            body.classList.remove('tonika-theme-light');
+            body.classList.add('tonika-theme-dark');
+        }
+    }
+</script>
+
+<!-- ===================================================================
+     MODULE DEPENDENCIES
+
+     Load any external dependencies your module needs here.
+     For Catchonika, we need MidiWriterJS.
+     ================================================================== -->
+<script src="https://cdn.jsdelivr.net/npm/midiwriter-js@2.0.3/build/midiwriter.min.js"></script>
+
+<!-- ===================================================================
+     YOUR MODULE
+
+     Load your module's JavaScript file.
+     ================================================================== -->
+<script src="src/catchonika.js"></script>
+
+<script>
+    // ===================================================================
+    // MODULE INITIALIZATION
+    //
+    // Initialize your module here. This example shows Catchonika setup.
+    // ===================================================================
+
+    // Initialize your module in the first tab
+    if (window.Catchonika) {
+        new window.Catchonika({
+            mount: "#your-module-mount",
+            mode: "card",
+            bufferMinutes: 60,
+            defaultBpm: 120,
+            groupByChannel: false,
+        });
+
+        // Also initialize in the theme test tab
+        new window.Catchonika({
+            mount: "#theme-test-mount",
+            mode: "card",
+            bufferMinutes: 30,
+            defaultBpm: 140,
+            groupByChannel: false,
+        });
+    }
+</script>
+
+</body>
+</html>
+

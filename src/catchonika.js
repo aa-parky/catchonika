@@ -1,6 +1,6 @@
 // Catchonika — default-on MIDI capture and one-click export to .mid
 // Card-ready: render neatly inside any container (tabs, panels, etc.)
-// v1.2.0 — persistent takes and event buffer via localStorage; fixed-height scroll card friendly
+// v1.3.0 — Refactored for Tonika Design System with BEM naming conventions
 
 (() => {
     const PPQ = 128;
@@ -449,66 +449,99 @@
                 clearTimeout(this._idleTimer);
                 this._idleTimer = null;
             }
-            const endMs = this._currentTake.lastActivityMs ?? ts() - this._start;
-            this._takes.push({ startMs: this._currentTake.startMs, endMs });
-            const takeNum = this._takes.length;
+            this._takes.push({
+                startMs: this._currentTake.startMs,
+                endMs: this._currentTake.lastActivityMs,
+            });
             this._currentTake = null;
             this._renderTakesList();
             this._schedulePersist();
-            this._status(`Take ${takeNum} ended`);
+            this._status(`Take ${this._takes.length} ended`);
         }
 
         _markActivity(t) {
-            if (!this._currentTake) return;
-            this._currentTake.lastActivityMs = t;
-            this._resetIdleTimer();
+            if (this._currentTake) {
+                this._currentTake.lastActivityMs = t;
+                this._resetIdleTimer();
+            }
         }
 
         _resetIdleTimer() {
-            if (!this._currentTake) return;
             if (this._idleTimer) clearTimeout(this._idleTimer);
-            const idleMs = Math.max(500, (this.settings.takeIdleSeconds ?? 3) * 1000);
-            this._idleTimer = setTimeout(() => this._endTake(), idleMs);
+            this._idleTimer = setTimeout(() => {
+                this._endTake();
+            }, this.settings.takeIdleSeconds * 1000);
         }
+
+        // --- Takes list rendering ------------------------------------------------
 
         _renderTakesList() {
             if (!this._takesListEl) return;
 
             const rows = [];
-            this._takes.forEach((t, i) => {
-                const length = t.endMs - t.startMs;
-                const startedAtEpoch = this._startEpoch + t.startMs;
-                const startedClock = this._fmtClock(startedAtEpoch);
+
+            // Render completed takes
+            for (let i = 0; i < this._takes.length; i++) {
+                const take = this._takes[i];
+                const startedClock = this._fmtClock(this._startEpoch + take.startMs);
+                const length = take.endMs - take.startMs;
+                const durationSeconds = Math.max(0, Math.round(length / 1000));
+
                 rows.push(
-                    `<div class="catchonika__take" title="Started ${startedClock} • Duration ${Math.max(0, Math.round(length / 1000))}s">
-                        <span class="catchonika__take-label">Take ${i + 1}</span>
-                        <span class="catchonika__take-time">
-                            <span class="catchonika__take-meta">Started: ${startedClock} • Duration: ${Math.max(0, Math.round(length / 1000))} seconds</span>
-                        </span>
-                        <button class="catchonika__btn catchonika__btn--small" data-action="save-take" data-index="${i}" title="Save this take">Save</button>
-                    </div>`,
-                );
-            });
-            if (this._currentTake) {
-                const i = this._takes.length;
-                const t = this._currentTake;
-                const now = t.lastActivityMs;
-                const length = now - t.startMs;
-                const startedAtEpoch = this._startEpoch + t.startMs;
-                const startedClock = this._fmtClock(startedAtEpoch);
-                rows.push(
-                    `<div class="catchonika__take catchonika__take--active" title="Recording… • Started ${startedClock} • Duration ${Math.max(0, Math.round(length / 1000))}s">
-                        <span class="catchonika__take-label">Take ${i + 1}</span>
-                        <span class="catchonika__take-time">
-                            <span class="catchonika__take-meta">Started: ${startedClock} • Duration: ${Math.max(0, Math.round(length / 1000))} seconds</span>
-                        </span>
-                        <span class="catchonika__take-badge">Recording…</span>
+                    `<div class="catchonika__take">
+                        <div class="catchonika__take-meta">
+                            <div class="catchonika__chip">
+                                <span class="dot"></span>
+                                Take ${i + 1}
+                            </div>
+                            <span class="catchonika__label u-ellipsis">Started: ${startedClock}</span>
+                        </div>
+                        <div class="catchonika__take-duration">
+                            Duration: ${durationSeconds} seconds
+                        </div>
+                        <div class="catchonika__take-actions">
+                            <button class="tonika-btn tonika-btn--primary" data-action="save-take" data-index="${i}" title="Save as MIDI">
+                                Save
+                            </button>
+                        </div>
                     </div>`,
                 );
             }
-            this._takesListEl.innerHTML =
-                rows.join("") ||
-                `<div class="catchonika__take-empty">No takes yet. Press sustain or just play to start a take.</div>`;
+
+            // Render current take (if recording)
+            if (this._currentTake) {
+                const startedClock = this._fmtClock(this._startEpoch + this._currentTake.startMs);
+                const length = this._currentTake.lastActivityMs - this._currentTake.startMs;
+                const durationSeconds = Math.max(0, Math.round(length / 1000));
+
+                rows.push(
+                    `<div class="catchonika__take">
+                        <div class="catchonika__take-meta">
+                            <div class="catchonika__chip">
+                                <span class="catchonika__rec-dot"></span>
+                                Take ${this._takes.length + 1}
+                            </div>
+                            <span class="catchonika__label u-ellipsis">Started: ${startedClock}</span>
+                        </div>
+                        <div class="catchonika__take-duration">
+                            Duration: ${durationSeconds} seconds
+                        </div>
+                        <div class="catchonika__take-actions">
+                            <div class="catchonika__badge">Recording…</div>
+                        </div>
+                    </div>`,
+                );
+            }
+
+            // Set the content
+            if (rows.length === 0) {
+                this._takesListEl.innerHTML = `
+                    <div class="catchonika__take-empty tonika-text-muted">
+                        No takes yet. Press sustain or just play to start a take.
+                    </div>`;
+            } else {
+                this._takesListEl.innerHTML = `<div class="catchonika__take-list">${rows.join("")}</div>`;
+            }
         }
 
         _fmtClock(epochMs) {
@@ -720,12 +753,12 @@
 
             if (!this._mount) {
                 const el = document.createElement("div");
-                el.className = `catchonika ${wantsFloating ? "catchonika--floating" : "catchonika--card"}`;
+                el.className = `tonika-module catchonika ${wantsFloating ? "catchonika--floating" : "catchonika--card"}`;
                 el.innerHTML = this._uiHTML();
                 document.body.appendChild(el);
                 this._mount = el;
             } else {
-                this._mount.classList.add("catchonika");
+                this._mount.classList.add("tonika-module", "catchonika");
                 this._mount.classList.add(
                     this.settings.mode === "card"
                         ? "catchonika--card"
@@ -751,6 +784,7 @@
                 this._mount.remove();
             } else {
                 this._mount.classList.remove(
+                    "tonika-module",
                     "catchonika",
                     "catchonika--card",
                     "catchonika--floating",
@@ -761,22 +795,22 @@
 
         _uiHTML() {
             return `
-        <div class="catchonika__row">
-          <span class="catchonika__indicator" aria-label="recording" title="Catchonika is recording"></span>
-          <strong class="catchonika__title">Catchonika</strong>
-          <label class="catchonika__bpm-wrap">BPM
-            <input class="catchonika__bpm" type="number" min="30" max="300" step="1" value="${this.settings.defaultBpm}">
-          </label>
-          <label class="catchonika__idle-wrap" title="Seconds of no MIDI activity to end a take">Idle s
-            <input class="catchonika__idle" type="number" min="1" max="30" step="0.5" value="${this.settings.takeIdleSeconds}">
-          </label>
-        </div>
-        <div class="catchonika__row catchonika__row--controls">
-          <button class="catchonika__btn catchonika__btn--ghost" data-action="clear" title="Clear buffer">Clear</button>
-        </div>
-        <div class="catchonika__takes"></div>
-        <div class="catchonika__status" aria-live="polite">Ready.</div>
-      `;
+                <div class="catchonika__header">
+                    <div class="catchonika__controls">
+                        <div class="catchonika__rec-dot" aria-label="recording" title="Catchonika is recording"></div>
+                        <strong>Catchonika</strong>
+                        <span class="tonika-text-muted">BPM</span>
+                        <input class="tonika-input catchonika__bpm" type="number" min="30" max="300" step="1" value="${this.settings.defaultBpm}">
+                        <span class="tonika-text-muted" title="Seconds of no MIDI activity to end a take">Idle s</span>
+                        <input class="tonika-input catchonika__number" type="number" min="1" max="30" step="0.5" value="${this.settings.takeIdleSeconds}">
+                    </div>
+                    <button class="tonika-btn" data-action="clear" title="Clear buffer">Clear</button>
+                </div>
+                <div class="catchonika__takes"></div>
+                <div class="catchonika__footer">
+                    <div class="catchonika__status tonika-text-muted" aria-live="polite">Ready.</div>
+                </div>
+            `;
         }
 
         _attachUIHandlers() {
@@ -794,7 +828,7 @@
             });
 
             this._mount.addEventListener("change", (e) => {
-                if (e.target && e.target.classList.contains("catchonika__idle")) {
+                if (e.target && e.target.classList.contains("catchonika__number")) {
                     const v = parseFloat(e.target.value);
                     if (Number.isFinite(v) && v > 0) {
                         this.settings.takeIdleSeconds = v;
@@ -813,3 +847,4 @@
 
     window.Catchonika = Catchonika;
 })();
+

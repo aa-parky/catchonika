@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tonika Bundle</title>
+    <!-- 2. SHARED COMPONENT STYLES (Buttons, Inputs, etc.) -->
+    <link rel="stylesheet" href="../styles/tonika-components.css" />
+    <!-- 1. CORE STYLES (Variables for Theming) -->
+    <link rel="stylesheet" href="../styles/tonika-core.css" />
+    <!-- 3. PAGE-SPECIFIC LAYOUT -->
+    <link rel="stylesheet" href="../styles/layout.css" />
+    <!-- 1. CORE STYLES (Variables for Theming) -->
+</head>
+
+<body class="tonika-theme-dark">
+
+<header>
+    <h1>Tonika</h1>
+</header>
+
+<main class="tonika-container">
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="active" onclick="openTab(0)">Catchonika</button>
+        <button onclick="openTab(1)">Tab 2</button>
+        <button onclick="openTab(2)">Tab 3</button>
+        <button onclick="openTab(3)">Tab 4</button>
+        <button onclick="openTab(4)">Tab 5</button>
+        <button onclick="openTab(5)">Tab 6</button>
+    </div>
+
+    <div class="tab-content">
+        <section class="active">
+            <!-- Catchonika styles -->
+            <link rel="stylesheet" href="../styles/catchonika.css" />
+            <!-- In-page mount -->
+            <div id="catchonika-card"></div>
+        </section>
+        <section>Content for Tab 2</section>
+        <section>Content for Tab 3</section>
+        <section>Content for Tab 4</section>
+        <section>Content for Tab 5</section>
+        <section>Content for Tab 6</section>
+    </div>
+
+    <!-- Keyboard -->
+    <div class="roll88">
+        Piano Roll
+    </div>
+</main>
+
+<footer>
+    <p>© 2025 My Piano Project</p>
+</footer>
+
+<script>
+    function openTab(index) {
+        const tabs = document.querySelectorAll('.tabs button');
+        const sections = document.querySelectorAll('.tab-content section');
+
+        tabs.forEach((tab, i) => {
+            tab.classList.toggle('active', i === index);
+            sections[i].classList.toggle('active', i === index);
+        });
+    }
+</script>
+
+<!-- Local MidiWriterJS (global `MidiWriter`) -->
+<script src="../vendor/midiwriter.js"></script>
+<!-- Catchonika core -->
+<script src="../src/catchonika.js"></script>
+
+<script>
+    // initialize catchonika
+    new window.Catchonika({
+        mount: "#catchonika-card", // render as a card inside this element
+        mode: "card",
+        bufferMinutes: 60,
+        defaultBpm: 120,
+        groupByChannel: false,
+    });
+</script>
+
+</body>
+</html>

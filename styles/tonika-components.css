@@ -1,0 +1,55 @@
+/* tonika-components.css */
+
+/* === Base Module Container === */
+.tonika-module {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-md);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+/* === Buttons === */
+.tonika-btn {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.tonika-btn:hover {
+  filter: brightness(95%);
+}
+.tonika-btn--primary {
+  background-color: var(--color-accent);
+  color: var(--color-accent-text);
+  border-color: var(--color-accent);
+}
+.tonika-btn--danger {
+  background-color: var(--color-danger);
+  color: var(--color-accent-text);
+  border-color: var(--color-danger);
+}
+
+/* === Inputs & Dropdowns === */
+.tonika-input,
+.tonika-select {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm);
+  width: 100%;
+}
+
+/* === Utility Classes === */
+.tonika-text-muted {
+  color: var(--color-text-muted);
+}

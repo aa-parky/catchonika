@@ -1,0 +1,46 @@
+/* tonika-core.css */
+:root {
+  /* 1. Font & Text */
+  --font-family-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  --font-family-mono: monospace;
+  --font-size-base: 14px;
+  --font-size-sm: 12px;
+  --font-size-xs: 10px;
+  --line-height-base: 1.4;
+
+  /* 2. Colors (Theming) */
+  /* Default to a light theme */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-text-primary: #212529;
+  --color-text-muted: #6c757d;
+  --color-border: #dee2e6;
+  --color-accent: #2b8cff;
+  --color-accent-text: #ffffff;
+  --color-danger: #dc3545;
+
+  /* 3. Sizing & Spacing */
+  --spacing-unit: 4px;
+  --spacing-xs: var(--spacing-unit);      /* 4px */
+  --spacing-sm: calc(var(--spacing-unit) * 2);  /* 8px */
+  --spacing-md: calc(var(--spacing-unit) * 3);  /* 12px */
+  --spacing-lg: calc(var(--spacing-unit) * 4);  /* 16px */
+
+  /* 4. Borders & Radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-width: 1px;
+}
+
+/* Dark Theme Override */
+.tonika-theme-dark {
+  --color-bg-primary: #0f1216;
+  --color-bg-secondary: #15202b;
+  --color-text-primary: #dbe7f3;
+  --color-text-muted: #9fb3c8;
+  --color-border: #1b222c;
+  --color-accent: #4b99ff;
+  --color-accent-text: #0f1216;
+  --color-danger: #ff3355;
+}

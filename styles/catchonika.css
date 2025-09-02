@@ -1,218 +1,153 @@
-/* Catchonika – lean dark theme */
-.catchonika {
-    --c-bg: #0f1216;
-    --c-bg-2: #0b0e12;
-    --c-border: #1b222c;
-    --c-text: #dbe7f3;
-    --c-muted: #9fb3c8;
-    --c-muted-2: #8aa2b8;
-    --c-btn-bg: #15202b;
-    --c-btn-bg-hover: #182635;
-    --c-rec: #ff3355;
+/*
+ * ===================================================================
+ * CATCHONIKA MODULE STYLES (Refactored for Tonika Design System)
+ *
+ * This file contains ONLY layout and structural styles unique to Catchonika.
+ * All theme (color, font, spacing) and common component (button, input)
+ * styles are inherited from tonika-core.css and tonika-components.css.
+ *
+ * HTML Structure Assumption:
+ * <div class="tonika-module catchonika catchonika--card">
+ *   ...
+ *   <button class="tonika-btn">Clear</button>
+ *   <input class="tonika-input catchonika__bpm" type="number">
+ *   ...
+ * </div>
+ * ===================================================================
+ */
 
-    font: 12px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-    color: var(--c-text);
-}
-
-/* Card – fixed height + scroll */
+/* Card Layout Modifier */
 .catchonika--card {
-    display: flex;
-    flex-direction: column;
-    width: 97%;
-    background: linear-gradient(180deg, var(--c-bg), var(--c-bg-2));
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 10px 12px;
-    gap: 10px;
-
-    height: 250px;          /* Fixed height as requested */
-    overflow: hidden;       /* Contain internals; list itself scrolls */
+    /* This modifier defines a specific, fixed-size layout */
+    height: 250px;
+    overflow: hidden; /* Contains child elements */
+    width: 100%; /* Let the parent container (.tab-content) control the width */
 }
 
-/* Header / Title row */
+/* Header / Title row layout */
 .catchonika__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--spacing-md); /* Use global spacing */
 }
 
-/* Small inline controls row */
+/* Small inline controls row layout */
 .catchonika__controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--spacing-sm); /* Use global spacing */
     flex-wrap: wrap;
 }
 
-/* Buttons */
-.catchonika__btn {
-    background: var(--c-btn-bg);
-    color: var(--c-text);
-    border: 1px solid var(--c-border);
-    border-radius: 10px;
-    padding: 8px 14px;         /* top/bottom, left/right */
-    cursor: pointer;
-    user-select: none;
-    transition: background 120ms ease, transform 80ms ease;
+/* Numeric inputs (BPM) - Layout override only */
+.catchonika__bpm,
+.catchonika__number {
+    /* The .tonika-input class handles theming. We only add geometry. */
+    width: 64px;
 }
-.catchonika__btn:hover { background: var(--c-btn-bg-hover); }
-.catchonika__btn:active { transform: translateY(1px); }
 
-.catchonika__btn.is-primary { border-color: #2b3b50; }
-.catchonika__btn.is-danger  { border-color: #4a1e25; color: #ffdbe1; }
-
-/* Record dot */
+/* Record dot - Unique element */
 .catchonika__rec-dot {
-    width: 10px; height: 10px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    background: var(--c-rec);
-    box-shadow: 0 0 0 2px rgba(255,51,85,0.15);
+    background: var(--color-danger); /* Use global danger color */
+    /* Use a semi-transparent version of the danger color for the shadow */
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 15%, transparent);
 }
 
-/* Status line + clear button share a row */
+/* Footer layout */
 .catchonika__footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--spacing-md);
 }
 
-/* Subdued text */
-.catchonika__muted { color: var(--c-muted); }
-.catchonika__muted-2 { color: var(--c-muted-2); }
-
-/* Numeric inputs (e.g., BPM) */
-.catchonika__bpm,
-.catchonika__number {
-    width: 64px;
-    background: #0f141a;
-    color: #e7f0fa;
-    border: 1px solid #233041;
-    border-radius: 8px;
-    padding: 4px 6px;
-    outline: none;
-}
-
-/* TAKES LIST ====================================================== */
-/* Only the list scrolls so headers stay visible */
+/* Takes List (Scrollable Area) - Layout */
 .catchonika__takes {
-    flex: 1;
-    min-height: 0;      /* critical so this child can actually shrink & scroll */
-    overflow: auto;
-    padding-right: 4px; /* keep scrollbar off content */
+    flex: 1; /* Allows this element to grow and fill available space */
+    min-height: 0; /* Critical for flexbox to allow shrinking and scrolling */
+    overflow-y: auto; /* Enable vertical scrolling */
+    padding-right: var(--spacing-xs); /* Keep scrollbar off content */
 }
 
-/* Optional: subtle, theme-friendly scrollbar */
+/* Theme-aware scrollbar for the takes list */
 .catchonika__takes::-webkit-scrollbar { width: 10px; }
-.catchonika__takes::-webkit-scrollbar-track { background: #0a0d12; border-radius: 10px; }
-.catchonika__takes::-webkit-scrollbar-thumb { background: #1b2735; border-radius: 10px; }
-.catchonika__takes::-webkit-scrollbar-thumb:hover { background: #223245; }
+.catchonika__takes::-webkit-scrollbar-track { background: var(--color-bg-primary); border-radius: 10px; }
+.catchonika__takes::-webkit-scrollbar-thumb { background: var(--color-bg-secondary); border-radius: 10px; }
+.catchonika__takes::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
 
 /* Takes list layout */
 .catchonika__take-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 6px;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
 }
 
-/* Single take row */
+/* Single Take Row - Unique element */
 .catchonika__take {
     display: grid;
     grid-template-columns: 1fr auto auto;
     align-items: center;
-    gap: 10px;
-    padding: 6px 8px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255,255,255,0.04);
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius-md);
+    /* Use a slightly tinted background to stand out from the main card */
+    background-color: color-mix(in srgb, var(--color-bg-secondary) 50%, transparent);
+    border: var(--border-width) solid var(--color-bg-secondary);
 }
 
-/* Left cluster: title / timing */
+/* Take meta-data layout (left cluster) */
 .catchonika__take-meta {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-width: 0; /* allow ellipsis to work */
+    gap: var(--spacing-md);
+    min-width: 0; /* Allow text truncation (ellipsis) to work */
 }
 
-/* Timing chips */
-.catchonika__chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    border-radius: 999px;
-    font-weight: 600;
-    border: 1px solid #223043;
-    background: #0f141a;
-    color: #e7f0fa;
-    white-space: nowrap;
-}
-.catchonika__chip .dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #4b99ff;
-}
-
-/* Duration (center column in your layout) */
+/* Take duration layout (center column) */
 .catchonika__take-duration {
     justify-self: end;
-    font-feature-settings: "tnum";
+    font-feature-settings: "tnum"; /* Enable tabular numbers for alignment */
     font-variant-numeric: tabular-nums;
-    color: var(--c-muted);
+    color: var(--color-text-muted); /* Use global muted color */
 }
 
-/* Right: actions */
+/* Take actions layout (right cluster) */
 .catchonika__take-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--spacing-sm);
 }
 
-/* Text truncation helper */
+/* Chip - Unique element */
+.catchonika__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: 999px; /* Pill shape */
+    font-weight: 600;
+    font-size: var(--font-size-xs);
+    border: var(--border-width) solid var(--color-border);
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+
+.catchonika__chip .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--color-accent); /* Use global accent color */
+}
+
+/* Universal text truncation helper */
 .u-ellipsis {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
-/* Small labels */
-.catchonika__label {
-    font-size: 11px;
-    color: var(--c-muted);
-}
-
-/* Badges */
-.catchonika__badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 10px;
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: #0e141b;
-    border: 1px solid #223043;
-    color: #b7c8da;
-}
-
-/* Minimal tables (if used anywhere) */
-.catchonika table {
-    width: 100%;
-    border-collapse: collapse;
-}
-.catchonika th,
-.catchonika td {
-    border-bottom: 1px solid var(--c-border);
-    padding: 6px 4px;
-    text-align: left;
-}
-.catchonika th { color: var(--c-muted); font-weight: 600; }
-
-/* Utility spacing */
-.u-gap-4 { gap: 4px; }
-.u-gap-6 { gap: 6px; }
-.u-gap-8 { gap: 8px; }
-.u-mt-6 { margin-top: 6px; }
-.u-mt-10 { margin-top: 10px; }
