@@ -69,7 +69,8 @@
     <div class="tab-content">
         <!-- Tab 1: Your Module -->
         <section class="active">
-            <div id="your-module-mount"></div>
+            <!-- In-page mount -->
+            <div id="catchonika-card"></div>
         </section>
 
         <!-- Tab 2: Light Theme Test -->
@@ -213,7 +214,7 @@
 
      Load your module's JavaScript file.
      ================================================================== -->
-<script src="src/catchonika.js"></script>
+<script src="../src/catchonika.js"></script>
 
 <script>
     // ===================================================================
@@ -225,7 +226,7 @@
     // Initialize your module in the first tab
     if (window.Catchonika) {
         new window.Catchonika({
-            mount: "#your-module-mount",
+            mount: "#catchonika-card",
             mode: "card",
             bufferMinutes: 60,
             defaultBpm: 120,
